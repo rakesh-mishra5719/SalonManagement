@@ -8,6 +8,13 @@ target/
 .expo/
 *.log
 
+# Database files
+*.mv.db
+*.lock.db
+*.trace.db
+server/data/
+data/
+
 # IDE
 .idea/
 *.iml

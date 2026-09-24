@@ -1,0 +1,10 @@
+# Exclude backend server and database files from mobile EAS build
+server/
+*.mv.db
+*.lock.db
+*.trace.db
+data/
+target/
+.idea/
+.vscode/
+*.log

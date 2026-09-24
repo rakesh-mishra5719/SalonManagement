@@ -1,0 +1,5 @@
+# Exclude local build artifacts
+node_modules/
+dist/
+.expo/
+*.log
