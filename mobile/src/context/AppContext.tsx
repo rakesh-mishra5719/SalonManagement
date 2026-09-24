@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { Salon, QueueEntry, SalonQueueDetails, UserRole } from '../types';
 import { api } from '../services/api';
 
+import { useAuth } from './AuthContext';
+
 interface AppContextType {
   role: UserRole;
   setRole: (role: UserRole) => void;
@@ -22,13 +24,24 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [role, setRole] = useState<UserRole>('customer');
+  const { user } = useAuth();
+  const [role, setRole] = useState<UserRole>(user?.role || 'CLIENT');
   const [salons, setSalons] = useState<Salon[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedSalon, setSelectedSalon] = useState<Salon | null>(null);
   const [activeBooking, setActiveBooking] = useState<QueueEntry | null>(null);
-  const [ownerSalonId, setOwnerSalonId] = useState<number>(1);
+  const [ownerSalonId, setOwnerSalonId] = useState<number>(user?.salonId || 1);
   const [ownerQueueDetails, setOwnerQueueDetails] = useState<SalonQueueDetails | null>(null);
+
+  // Sync role and ownerSalonId when auth user changes
+  useEffect(() => {
+    if (user) {
+      setRole(user.role);
+      if (user.salonId) {
+        setOwnerSalonId(user.salonId);
+      }
+    }
+  }, [user]);
 
   // Default coordinate (Bengaluru central hub)
   const userLocation = { lat: 12.9716, lng: 77.5946 };
@@ -48,21 +61,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [userLocation.lat, userLocation.lng]);
 
   const refreshOwnerQueue = useCallback(async () => {
-    if (!ownerSalonId) return;
+    const targetId = user?.salonId || ownerSalonId;
+    if (!targetId) return;
     try {
-      const details = await api.getSalonQueue(ownerSalonId);
+      const details = await api.getSalonQueue(targetId);
       setOwnerQueueDetails(details);
     } catch (err) {
       console.error('Failed to load owner queue:', err);
     }
-  }, [ownerSalonId]);
+  }, [ownerSalonId, user?.salonId]);
 
   useEffect(() => {
     refreshSalons();
   }, [refreshSalons]);
 
   useEffect(() => {
-    if (role === 'owner') {
+    if (role === 'OWNER') {
       refreshOwnerQueue();
     }
   }, [role, ownerSalonId, refreshOwnerQueue]);

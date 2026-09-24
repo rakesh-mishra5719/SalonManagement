@@ -13,6 +13,7 @@ import {
 import { Salon, QueueEntry } from '../types';
 import { useTheme } from '../context/ThemeContext';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -43,13 +44,21 @@ const availableServices = [
 export const BookSlotModal: React.FC<BookSlotModalProps> = ({ visible, salon, onClose }) => {
   const { colors, getCardStyle, designPattern } = useTheme();
   const { setActiveBooking, refreshSalons } = useApp();
+  const { user } = useAuth();
 
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState(user?.name || '');
+  const [customerPhone, setCustomerPhone] = useState(user?.phone || '');
   const [selectedSlot, setSelectedSlot] = useState(availableSlots[0]);
   const [selectedService, setSelectedService] = useState(availableServices[0].name);
   const [submitting, setSubmitting] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState<QueueEntry | null>(null);
+
+  React.useEffect(() => {
+    if (user) {
+      if (user.name) setCustomerName(user.name);
+      if (user.phone) setCustomerPhone(user.phone);
+    }
+  }, [user]);
 
   if (!salon) return null;
 
@@ -66,6 +75,7 @@ export const BookSlotModal: React.FC<BookSlotModalProps> = ({ visible, salon, on
         customerPhone: customerPhone.trim(),
         serviceName: selectedService,
         slotTime: selectedSlot,
+        userId: user?.id,
       });
 
       setConfirmedBooking(entry);
@@ -129,20 +139,20 @@ export const BookSlotModal: React.FC<BookSlotModalProps> = ({ visible, salon, on
                     </View>
                   </View>
 
-                  {/* Customer Arrival Verification Code */}
-                  <View style={styles.codeContainer}>
-                    <Text style={[styles.codeLabel, { color: colors.textSecondary }]}>
-                      YOUR ARRIVAL VERIFICATION CODE
-                    </Text>
-                    <View style={[styles.codeBox, { borderColor: colors.accent }]}>
-                      <Text style={[styles.codeText, { color: colors.textPrimary }]}>
-                        {confirmedBooking.verificationCode}
+                    {/* Customer Arrival Verification Code */}
+                    <View style={styles.codeContainer}>
+                      <Text style={[styles.codeLabel, { color: colors.textSecondary }]}>
+                        YOUR 6-DIGIT ARRIVAL CODE
+                      </Text>
+                      <View style={[styles.codeBox, { borderColor: colors.accent }]}>
+                        <Text style={[styles.codeText, { color: colors.textPrimary }]}>
+                          {confirmedBooking.verificationCode}
+                        </Text>
+                      </View>
+                      <Text style={[styles.codeInstruction, { color: colors.textTertiary }]}>
+                        Give this 6-digit code to the salon owner upon arrival to verify & begin your service.
                       </Text>
                     </View>
-                    <Text style={[styles.codeInstruction, { color: colors.textTertiary }]}>
-                      Give this code to the salon owner upon arrival to verify & begin your slot.
-                    </Text>
-                  </View>
 
                   {/* Slot Details */}
                   <View style={[styles.passDetailsRow, { borderTopColor: colors.divider }]}>

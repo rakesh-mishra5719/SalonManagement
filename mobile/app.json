@@ -15,10 +15,16 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#FAFAFA"
-      }
+      },
+      "package": "com.supportrakesh5719.salonmanagementmobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5b349554-8503-4ec0-9cb7-22848428c0a7"
+      }
     }
   }
 }

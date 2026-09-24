@@ -25,6 +25,90 @@ export const setApiBaseUrl = (url: string) => {
 export const getApiBaseUrl = () => BASE_URL;
 
 export const api = {
+  // Authentication & OTP
+  async sendOtp(phone: string): Promise<{ success: boolean; message: string; demoOtp?: string }> {
+    const response = await fetch(`${BASE_URL}/auth/otp/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone }),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(err || 'Failed to send OTP');
+    }
+    return await response.json();
+  },
+
+  async registerClient(data: { name: string; phone: string; password: string; otpCode: string }): Promise<any> {
+    const response = await fetch(`${BASE_URL}/auth/client/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      let msg = 'Registration failed';
+      try {
+        msg = JSON.parse(err).message || msg;
+      } catch (_) {
+        msg = err || msg;
+      }
+      throw new Error(msg);
+    }
+    return await response.json();
+  },
+
+  async registerOwner(data: {
+    name: string;
+    email?: string;
+    phone?: string;
+    password: string;
+    shopName: string;
+    tagline?: string;
+    category?: string;
+    address: string;
+    latitude?: number;
+    longitude?: number;
+    openingTime?: string;
+    closingTime?: string;
+    chairsCount?: number;
+  }): Promise<any> {
+    const response = await fetch(`${BASE_URL}/auth/owner/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      let msg = 'Owner registration failed';
+      try {
+        msg = JSON.parse(err).message || msg;
+      } catch (_) {
+        msg = err || msg;
+      }
+      throw new Error(msg);
+    }
+    return await response.json();
+  },
+
+  async login(identifier: string, password: string): Promise<any> {
+    const response = await fetch(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, password }),
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      let msg = 'Login failed';
+      try {
+        msg = JSON.parse(err).message || msg;
+      } catch (_) {
+        msg = err || msg;
+      }
+      throw new Error(msg);
+    }
+    return await response.json();
+  },
   async getNearbySalons(lat = 12.9716, lng = 77.5946): Promise<Salon[]> {
     try {
       const response = await fetch(`${BASE_URL}/salons/nearby?lat=${lat}&lng=${lng}`);
@@ -64,7 +148,7 @@ export const api = {
 
   async joinQueue(
     salonId: number,
-    data: { customerName: string; customerPhone?: string; serviceName?: string; slotTime?: string }
+    data: { customerName: string; customerPhone?: string; serviceName?: string; slotTime?: string; userId?: number }
   ): Promise<QueueEntry> {
     try {
       const response = await fetch(`${BASE_URL}/salons/${salonId}/queue/join`, {
@@ -79,11 +163,12 @@ export const api = {
       return await response.json();
     } catch (err: any) {
       console.warn('API error, generating local queue entry:', err);
-      // Fallback local generation if server is offline
-      const randomCode = 'SLN-' + Math.floor(1000 + Math.random() * 9000);
+      // Fallback local generation if server is offline (6-digit code)
+      const randomCode = String(Math.floor(100000 + Math.random() * 900000));
       return {
         id: Date.now(),
         salonId,
+        userId: data.userId,
         customerName: data.customerName || 'Valued Guest',
         customerPhone: data.customerPhone,
         serviceName: data.serviceName || 'Custom Styling',

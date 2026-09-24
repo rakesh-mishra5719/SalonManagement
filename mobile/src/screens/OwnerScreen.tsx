@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { SalonQueueDetails, QueueEntry } from '../types';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 export const OwnerScreen: React.FC = () => {
   const { colors, getCardStyle, designPattern } = useTheme();
   const { salons, ownerSalonId, setOwnerSalonId, refreshSalons } = useApp();
+  const { user } = useAuth();
 
   const [queueDetails, setQueueDetails] = useState<SalonQueueDetails | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,7 +33,14 @@ export const OwnerScreen: React.FC = () => {
     entry?: QueueEntry;
   } | null>(null);
 
-  const activeSalon = salons.find((s) => s.id === ownerSalonId) || salons[0];
+  // Default to owner's registered salon
+  useEffect(() => {
+    if (user?.salonId) {
+      setOwnerSalonId(user.salonId);
+    }
+  }, [user?.salonId]);
+
+  const activeSalon = salons.find((s) => s.id === (user?.salonId || ownerSalonId)) || salons[0];
 
   const fetchQueue = async () => {
     if (!activeSalon) return;
@@ -159,13 +168,13 @@ export const OwnerScreen: React.FC = () => {
                   ]}
                 />
                 <Text style={[styles.statusTitle, { color: colors.textPrimary }]}>
-                  {activeSalon.isOpen ? 'Salon is Open' : 'Salon is Closed'}
+                  {activeSalon.isOpen ? 'Shop is Open (Morning Hours)' : 'Shop is Closed (Evening Hours)'}
                 </Text>
               </View>
               <Text style={[styles.statusSub, { color: colors.textSecondary }]}>
                 {activeSalon.isOpen
-                  ? 'Accepting incoming customers & bookings'
-                  : 'Closed for walk-ins and new slots'}
+                  ? 'Open for walk-ins & appointments today. Tap switch to close this evening.'
+                  : 'Closed for the night. Tap switch every morning to open your shop.'}
               </Text>
             </View>
 
@@ -184,26 +193,30 @@ export const OwnerScreen: React.FC = () => {
         <View style={styles.verifyHeader}>
           <Ionicons name="shield-checkmark-outline" size={18} color={colors.accent} style={{ marginRight: 6 }} />
           <Text style={[styles.verifyTitle, { color: colors.textPrimary }]}>
-            Verify Arriving Customer
+            Verify Arriving Client (6-Digit Code)
           </Text>
         </View>
         <Text style={[styles.verifySub, { color: colors.textSecondary }]}>
-          When a customer arrives, ask for their confirmation code to confirm their slot and admit them.
+          When a client arrives, enter their 6-digit verification code to confirm their slot and admit them to the styling chair.
         </Text>
 
         <View style={styles.inputRow}>
           <TextInput
-            placeholder="Enter Code (e.g. SLN-4819)"
+            placeholder="Enter 6-Digit Code (e.g. 481923)"
             placeholderTextColor={colors.textTertiary}
             value={codeInput}
             onChangeText={setCodeInput}
-            autoCapitalize="characters"
+            keyboardType="numeric"
+            maxLength={6}
             style={[
               styles.codeInput,
               {
                 backgroundColor: colors.inputBg,
                 borderColor: colors.inputBorder,
                 color: colors.textPrimary,
+                fontSize: 16,
+                letterSpacing: 3,
+                textAlign: 'center',
               },
             ]}
           />
@@ -217,7 +230,7 @@ export const OwnerScreen: React.FC = () => {
               <ActivityIndicator color={colors.accentText} size="small" />
             ) : (
               <Text style={[styles.verifyBtnText, { color: colors.accentText }]}>
-                Verify Slot
+                Verify & Admit
               </Text>
             )}
           </TouchableOpacity>

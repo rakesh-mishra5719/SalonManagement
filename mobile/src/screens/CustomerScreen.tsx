@@ -26,6 +26,24 @@ export const CustomerScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [bookingSalon, setBookingSalon] = useState<Salon | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [gpsLocation, setGpsLocation] = useState<string>('Detecting nearby salons...');
+
+  // User Requirement: App asks access current location
+  React.useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setGpsLocation(`GPS Active: ${pos.coords.latitude.toFixed(2)}°N, ${pos.coords.longitude.toFixed(2)}°E`);
+        },
+        () => {
+          setGpsLocation('Bengaluru Metropolitan Hub (Default Location)');
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
+      );
+    } else {
+      setGpsLocation('Location Active');
+    }
+  }, []);
 
   const filteredSalons = salons.filter(
     (s) =>
@@ -41,6 +59,13 @@ export const CustomerScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* GPS Location Notification Pill */}
+      <View style={styles.locationHeaderRow}>
+        <Ionicons name="location" size={12} color={colors.accent} style={{ marginRight: 5 }} />
+        <Text style={[styles.locationHeaderText, { color: colors.textSecondary }]}>
+          {gpsLocation}
+        </Text>
+      </View>
       {/* Search & View Switcher */}
       <View style={styles.topControls}>
         {/* Search Bar */}
@@ -307,5 +332,16 @@ const styles = StyleSheet.create({
   listHeaderSub: {
     fontSize: 11,
     marginTop: 2,
+  },
+  locationHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  locationHeaderText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
 });

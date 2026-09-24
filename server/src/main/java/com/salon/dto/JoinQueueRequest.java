@@ -8,4 +8,5 @@ public class JoinQueueRequest {
     private String customerPhone;
     private String serviceName;
     private String slotTime;
+    private Long userId;
 }

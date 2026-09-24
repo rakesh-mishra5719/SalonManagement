@@ -24,6 +24,8 @@ public class QueueEntry {
     @Column(nullable = false)
     private Long salonId;
 
+    private Long userId;
+
     @Column(nullable = false)
     private String customerName;
 

@@ -1,10 +1,21 @@
-export type UserRole = 'customer' | 'owner';
+export type UserRole = 'CLIENT' | 'OWNER';
 
 export type ThemeMode = 'light' | 'dark';
 
 export type DesignPattern = 'glassmorphism' | 'flat-minimal' | 'neumorphic';
 
 export type QueueStatus = 'WAITING' | 'SERVING' | 'COMPLETED' | 'CANCELLED';
+
+export interface User {
+  id: number;
+  name: string;
+  phone?: string;
+  email?: string;
+  role: UserRole;
+  salonId?: number;
+  salon?: Salon;
+  token?: string;
+}
 
 export interface Salon {
   id: number;
@@ -18,6 +29,10 @@ export interface Salon {
   phone?: string;
   category?: string;
   imageUrl?: string;
+  ownerId?: number;
+  openingTime?: string;
+  closingTime?: string;
+  chairsCount?: number;
   averageServiceTimeMinutes?: number;
   distanceKm?: number;
   waitingCount?: number;
@@ -29,9 +44,10 @@ export interface Salon {
 export interface QueueEntry {
   id: number;
   salonId: number;
+  userId?: number;
   customerName: string;
   customerPhone?: string;
-  verificationCode: string;
+  verificationCode: string; // 6-digit number
   serviceName?: string;
   slotTime?: string;
   status: QueueStatus;

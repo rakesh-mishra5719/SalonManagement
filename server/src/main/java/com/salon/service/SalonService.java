@@ -96,6 +96,7 @@ public class SalonService {
 
         QueueEntry entry = QueueEntry.builder()
                 .salonId(salonId)
+                .userId(request.getUserId())
                 .customerName(request.getCustomerName() != null && !request.getCustomerName().isBlank() ? request.getCustomerName().trim() : "Valued Guest")
                 .customerPhone(request.getCustomerPhone())
                 .serviceName(request.getServiceName() != null ? request.getServiceName() : "Standard Styling")
@@ -240,9 +241,9 @@ public class SalonService {
     }
 
     private String generateUniqueVerificationCode() {
-        // Generates an elegant alphanumeric verification code e.g. "SLN-8429"
-        int num = 1000 + random.nextInt(9000);
-        return "SLN-" + num;
+        // Generates a strictly 6-digit confirmation code e.g. "842915"
+        int num = 100000 + random.nextInt(900000);
+        return String.valueOf(num);
     }
 
     private double calculateHaversineDistance(Double lat1, Double lon1, Double lat2, Double lon2) {

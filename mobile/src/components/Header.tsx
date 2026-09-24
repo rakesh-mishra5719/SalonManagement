@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 interface HeaderProps {
@@ -9,8 +9,15 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
-  const { mode, toggleMode, colors, getCardStyle } = useTheme();
-  const { role, setRole } = useApp();
+  const { mode, toggleMode, colors } = useTheme();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: logout },
+    ]);
+  };
 
   return (
     <View style={[styles.container, { borderBottomColor: colors.divider }]}>
@@ -59,73 +66,56 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
           >
             <Ionicons name="options-outline" size={15} color={colors.textPrimary} />
           </TouchableOpacity>
+
+          {/* Logout Button */}
+          {user && (
+            <TouchableOpacity
+              onPress={handleLogout}
+              activeOpacity={0.7}
+              style={[
+                styles.logoutButton,
+                {
+                  borderColor: colors.cardBorder,
+                  backgroundColor: colors.surfaceMuted,
+                },
+              ]}
+              accessibilityLabel="Sign Out"
+            >
+              <Ionicons name="log-out-outline" size={15} color={colors.danger} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {/* Role Switcher Pill Bar (User / Customer vs Salon Owner) */}
-      <View style={styles.roleBarContainer}>
-        <View style={[styles.roleSwitchBackground, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setRole('customer')}
+      {/* Authenticated User Status Bar */}
+      {user && (
+        <View style={styles.userInfoRow}>
+          <View
             style={[
-              styles.roleTab,
-              role === 'customer' && [
-                styles.roleTabActive,
-                { backgroundColor: colors.accent, shadowColor: colors.accent },
-              ],
+              styles.userPill,
+              {
+                backgroundColor: colors.surfaceMuted,
+                borderColor: colors.cardBorder,
+              },
             ]}
           >
             <Ionicons
-              name="person-outline"
+              name={user.role === 'OWNER' ? 'storefront-outline' : 'person-outline'}
               size={12}
-              color={role === 'customer' ? colors.accentText : colors.textSecondary}
+              color={user.role === 'OWNER' ? colors.accent : colors.success}
               style={{ marginRight: 6 }}
             />
-            <Text
-              style={[
-                styles.roleTabText,
-                {
-                  color: role === 'customer' ? colors.accentText : colors.textSecondary,
-                  fontWeight: role === 'customer' ? '600' : '400',
-                },
-              ]}
-            >
-              Customer / Explore
+            <Text style={[styles.userNameText, { color: colors.textPrimary }]} numberOfLines={1}>
+              {user.name}
             </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setRole('owner')}
-            style={[
-              styles.roleTab,
-              role === 'owner' && [
-                styles.roleTabActive,
-                { backgroundColor: colors.accent, shadowColor: colors.accent },
-              ],
-            ]}
-          >
-            <Ionicons
-              name="storefront-outline"
-              size={12}
-              color={role === 'owner' ? colors.accentText : colors.textSecondary}
-              style={{ marginRight: 6 }}
-            />
-            <Text
-              style={[
-                styles.roleTabText,
-                {
-                  color: role === 'owner' ? colors.accentText : colors.textSecondary,
-                  fontWeight: role === 'owner' ? '600' : '400',
-                },
-              ]}
-            >
-              Salon Owner Portal
-            </Text>
-          </TouchableOpacity>
+            <View style={[styles.roleTag, { backgroundColor: colors.accentLight }]}>
+              <Text style={[styles.roleTagText, { color: colors.textPrimary }]}>
+                {user.role === 'OWNER' ? 'Owner' : 'Client'}
+              </Text>
+            </View>
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 };
@@ -134,14 +124,13 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 18,
     paddingTop: Platform.OS === 'ios' ? 12 : 16,
-    paddingBottom: 14,
+    paddingBottom: 12,
     borderBottomWidth: 1,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
   },
   brandContainer: {
     flexDirection: 'row',
@@ -186,33 +175,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  roleBarContainer: {
-    alignItems: 'center',
-  },
-  roleSwitchBackground: {
-    flexDirection: 'row',
-    borderRadius: 100,
-    padding: 3,
+  logoutButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1,
-    width: '100%',
-    maxWidth: 360,
-  },
-  roleTab: {
-    flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 7,
+  },
+  userInfoRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 100,
+    borderWidth: 1,
+    maxWidth: '100%',
   },
-  roleTabActive: {
-    elevation: 2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+  userNameText: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginRight: 6,
+    maxWidth: 180,
   },
-  roleTabText: {
-    fontSize: 12,
-    letterSpacing: 0.2,
+  roleTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  roleTagText: {
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });

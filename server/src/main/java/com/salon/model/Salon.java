@@ -46,6 +46,17 @@ public class Salon {
 
     private String category; // e.g., "Luxe Hair & Spa", "Barbershop", "Beauty Lounge"
 
+    private Long ownerId;
+
+    @Builder.Default
+    private String openingTime = "09:00 AM";
+
+    @Builder.Default
+    private String closingTime = "09:00 PM";
+
+    @Builder.Default
+    private Integer chairsCount = 4;
+
     @Builder.Default
     private Integer averageServiceTimeMinutes = 20;
 
