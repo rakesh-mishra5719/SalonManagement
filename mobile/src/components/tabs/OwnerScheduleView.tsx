@@ -20,7 +20,9 @@ export const OwnerScheduleView: React.FC = () => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>Today's Appointment Schedule</Text>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>
+          {user?.salon?.name || 'My Salon'} • Schedule
+        </Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Manage time slots, chair allocations, and expected client arrivals
         </Text>

@@ -7,6 +7,7 @@ import { AppIcon } from '../AppIcon';
 
 export const OwnerAnalyticsView: React.FC = () => {
   const { colors, getCardStyle } = useTheme();
+  const { user } = useAuth();
   const { ownerQueueDetails } = useApp();
 
   const completedCount = ownerQueueDetails?.completedTodayCount ?? 14;
@@ -24,7 +25,9 @@ export const OwnerAnalyticsView: React.FC = () => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>Salon Performance Analytics</Text>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>
+          {user?.salon?.name || 'My Salon'} • Analytics
+        </Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Live footfall tracking and operational metrics
         </Text>

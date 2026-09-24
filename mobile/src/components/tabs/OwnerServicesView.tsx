@@ -20,7 +20,9 @@ export const OwnerServicesView: React.FC = () => {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>Salon Services & Menu</Text>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>
+          {user?.salon?.name || 'My Salon'} • Services & Menu
+        </Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Manage your offered salon services, durations, and pricing
         </Text>

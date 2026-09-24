@@ -16,11 +16,11 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { SalonQueueDetails, QueueEntry } from '../types';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from '../components/AppIcon';
 
 export const OwnerScreen: React.FC = () => {
-  const { colors, getCardStyle, designPattern } = useTheme();
-  const { salons, ownerSalonId, setOwnerSalonId, refreshSalons } = useApp();
+  const { colors, getCardStyle } = useTheme();
+  const { salons, refreshSalons } = useApp();
   const { user } = useAuth();
 
   const [queueDetails, setQueueDetails] = useState<SalonQueueDetails | null>(null);
@@ -33,14 +33,12 @@ export const OwnerScreen: React.FC = () => {
     entry?: QueueEntry;
   } | null>(null);
 
-  // Default to owner's registered salon
-  useEffect(() => {
-    if (user?.salonId) {
-      setOwnerSalonId(user.salonId);
-    }
-  }, [user?.salonId]);
-
-  const activeSalon = salons.find((s) => s.id === (user?.salonId || ownerSalonId)) || salons[0];
+  // Strictly lock to the authenticated owner's salon - no other salons shown
+  const activeSalon =
+    user?.salon ||
+    (user?.salonId ? salons.find((s) => s.id === user.salonId) : null) ||
+    salons.find((s) => s.ownerId === user?.id) ||
+    salons[0];
 
   const fetchQueue = async () => {
     if (!activeSalon) return;
@@ -56,8 +54,10 @@ export const OwnerScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchQueue();
-  }, [ownerSalonId, activeSalon?.id]);
+    if (activeSalon?.id) {
+      fetchQueue();
+    }
+  }, [activeSalon?.id]);
 
   const handleToggleOpen = async (value: boolean) => {
     if (!activeSalon) return;
@@ -73,7 +73,7 @@ export const OwnerScreen: React.FC = () => {
   // User Requirement: "when a user comes to salon owner he give his code that verify and confirm slot"
   const handleVerifyCode = async () => {
     if (!codeInput.trim()) {
-      Alert.alert('Required', 'Please enter customer verification code (e.g. SLN-1024)');
+      Alert.alert('Required', 'Please enter customer 6-digit verification code (e.g. 849201)');
       return;
     }
 
@@ -119,40 +119,32 @@ export const OwnerScreen: React.FC = () => {
       }
       showsVerticalScrollIndicator={false}
     >
-      {/* Salon Selection Bar */}
-      <View style={styles.selectorContainer}>
-        <Text style={[styles.selectorLabel, { color: colors.textSecondary }]}>MANAGING SALON</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.salonChipsRow}>
-          {salons.map((s) => {
-            const isSelected = s.id === ownerSalonId;
-            return (
-              <TouchableOpacity
-                key={s.id}
-                activeOpacity={0.7}
-                onPress={() => setOwnerSalonId(s.id)}
-                style={[
-                  styles.salonChip,
-                  {
-                    backgroundColor: isSelected ? colors.accent : colors.surfaceMuted,
-                    borderColor: isSelected ? colors.accent : colors.cardBorder,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.salonChipText,
-                    {
-                      color: isSelected ? colors.accentText : colors.textPrimary,
-                      fontWeight: isSelected ? '700' : '500',
-                    },
-                  ]}
-                >
-                  {s.name}
+      {/* Dedicated Owner Salon Profile Card (Strictly only owner's registered salon) */}
+      <View style={[styles.salonHeaderCard, getCardStyle()]}>
+        <View style={styles.salonHeaderTop}>
+          <View style={{ flex: 1 }}>
+            <View style={styles.ownerBadgeRow}>
+              <View style={[styles.verifiedTag, { backgroundColor: colors.accentLight }]}>
+                <AppIcon name="shield-checkmark-outline" size={11} color={colors.accent} />
+                <Text style={[styles.verifiedTagText, { color: colors.textPrimary }]}>
+                  OWNER WORKSPACE
                 </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+              </View>
+              <Text style={[styles.ownerIdText, { color: colors.textTertiary }]}>
+                Shop ID #{activeSalon?.id || 1}
+              </Text>
+            </View>
+            <Text style={[styles.salonTitle, { color: colors.textPrimary }]}>
+              {activeSalon?.name || user?.salon?.name || 'Your Salon'}
+            </Text>
+            <Text style={[styles.salonSubtitle, { color: colors.textSecondary }]}>
+              📍 {activeSalon?.address || user?.salon?.address || 'Registered Salon Address'}
+            </Text>
+            <Text style={[styles.managerText, { color: colors.textTertiary }]}>
+              Manager: {user?.name || 'Owner'} · {activeSalon?.category || 'Salon Atelier'}
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* Salon Open/Closed Status Card */}
@@ -191,7 +183,7 @@ export const OwnerScreen: React.FC = () => {
       {/* Code Verification Box */}
       <View style={[styles.verifyCard, getCardStyle()]}>
         <View style={styles.verifyHeader}>
-          <Ionicons name="shield-checkmark-outline" size={18} color={colors.accent} style={{ marginRight: 6 }} />
+          <AppIcon name="shield-checkmark-outline" size={18} color={colors.accent} style={{ marginRight: 6 }} />
           <Text style={[styles.verifyTitle, { color: colors.textPrimary }]}>
             Verify Arriving Client (6-Digit Code)
           </Text>
@@ -202,7 +194,7 @@ export const OwnerScreen: React.FC = () => {
 
         <View style={styles.inputRow}>
           <TextInput
-            placeholder="Enter 6-Digit Code (e.g. 481923)"
+            placeholder="Enter 6-Digit Code (e.g. 849201)"
             placeholderTextColor={colors.textTertiary}
             value={codeInput}
             onChangeText={setCodeInput}
@@ -229,14 +221,11 @@ export const OwnerScreen: React.FC = () => {
             {verifying ? (
               <ActivityIndicator color={colors.accentText} size="small" />
             ) : (
-              <Text style={[styles.verifyBtnText, { color: colors.accentText }]}>
-                Verify & Admit
-              </Text>
+              <Text style={[styles.verifyBtnText, { color: colors.accentText }]}>Admit Client</Text>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* Verification Alert Banner */}
         {verificationFeedback && (
           <View
             style={[
@@ -247,7 +236,7 @@ export const OwnerScreen: React.FC = () => {
               },
             ]}
           >
-            <Ionicons
+            <AppIcon
               name={verificationFeedback.success ? 'checkmark-circle' : 'alert-circle'}
               size={16}
               color={verificationFeedback.success ? colors.success : colors.danger}
@@ -334,7 +323,7 @@ export const OwnerScreen: React.FC = () => {
                 onPress={() => handleCompleteService(entry.id)}
                 style={[styles.completeBtn, { backgroundColor: colors.accent }]}
               >
-                <Ionicons name="checkmark-done" size={14} color={colors.accentText} style={{ marginRight: 6 }} />
+                <AppIcon name="checkmark-done" size={14} color={colors.accentText} style={{ marginRight: 6 }} />
                 <Text style={[styles.completeBtnText, { color: colors.accentText }]}>
                   Mark Service Completed
                 </Text>
@@ -396,34 +385,57 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  selectorContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
+  salonHeaderCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 18,
   },
-  selectorLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
+  salonHeaderTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  ownerBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  salonChipsRow: {
+  verifiedTag: {
     flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4,
   },
-  salonChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginRight: 8,
+  verifiedTagText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  salonChipText: {
+  ownerIdText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  salonTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  salonSubtitle: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  managerText: {
     fontSize: 11,
   },
   statusCard: {
     marginHorizontal: 16,
     marginTop: 10,
     padding: 16,
+    borderRadius: 18,
   },
   statusRow: {
     flexDirection: 'row',
@@ -447,11 +459,13 @@ const styles = StyleSheet.create({
   },
   statusSub: {
     fontSize: 11,
+    marginTop: 2,
   },
   verifyCard: {
     marginHorizontal: 16,
     marginTop: 14,
     padding: 16,
+    borderRadius: 18,
   },
   verifyHeader: {
     flexDirection: 'row',
@@ -525,6 +539,7 @@ const styles = StyleSheet.create({
     padding: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 16,
   },
   metricNum: {
     fontSize: 22,
@@ -547,6 +562,7 @@ const styles = StyleSheet.create({
   servingCard: {
     padding: 16,
     marginBottom: 10,
+    borderRadius: 16,
   },
   servingHeader: {
     flexDirection: 'row',
@@ -555,7 +571,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   customerName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
   },
   customerDetails: {
@@ -563,20 +579,20 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   codeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 8,
   },
   codeBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 2,
   },
   completeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 9,
+    paddingVertical: 10,
     borderRadius: 10,
   },
   completeBtnText: {
@@ -586,39 +602,43 @@ const styles = StyleSheet.create({
   waitingCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 14,
     marginBottom: 8,
-    gap: 10,
+    borderRadius: 16,
   },
   positionBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
   },
   positionNumber: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
   },
   codeBadgeSmall: {
-    paddingHorizontal: 7,
+    borderWidth: 1,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
-    borderWidth: 1,
   },
   codeBadgeSmallText: {
-    fontSize: 10,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1,
   },
   emptyBox: {
-    padding: 16,
     borderWidth: 1,
     borderStyle: 'dashed',
     borderRadius: 14,
+    padding: 20,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyText: {
-    fontSize: 11,
+    fontSize: 12,
     textAlign: 'center',
   },
 });
