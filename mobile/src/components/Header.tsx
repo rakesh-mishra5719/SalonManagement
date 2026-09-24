@@ -2,13 +2,14 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from './AppIcon';
 
 interface HeaderProps {
   onOpenSettings: () => void;
+  onOpenProfile?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenProfile }) => {
   const { mode, toggleMode, colors } = useTheme();
   const { user, logout } = useAuth();
 
@@ -18,6 +19,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
       { text: 'Sign Out', style: 'destructive', onPress: logout },
     ]);
   };
+
+  const userInitial = user?.name ? user.name.charAt(0).toUpperCase() : 'U';
 
   return (
     <View style={[styles.container, { borderBottomColor: colors.divider }]}>
@@ -44,7 +47,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
             ]}
             accessibilityLabel="Toggle Theme Mode"
           >
-            <Ionicons
+            <AppIcon
               name={mode === 'light' ? 'moon-outline' : 'sunny-outline'}
               size={12} // Explicitly very small icon
               color={colors.textSecondary}
@@ -64,10 +67,28 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
             ]}
             accessibilityLabel="Settings & Design Pattern"
           >
-            <Ionicons name="options-outline" size={15} color={colors.textPrimary} />
+            <AppIcon name="options-outline" size={15} color={colors.textPrimary} />
           </TouchableOpacity>
 
-          {/* Logout Button */}
+          {/* USER REQUIREMENT: Top Right Corner User Icon (Click to open profile details) */}
+          {user && (
+            <TouchableOpacity
+              onPress={onOpenProfile}
+              activeOpacity={0.7}
+              style={[
+                styles.profileButton,
+                {
+                  borderColor: colors.accent,
+                  backgroundColor: colors.accentLight,
+                },
+              ]}
+              accessibilityLabel="View Profile and Account Details"
+            >
+              <AppIcon name="person-circle-outline" size={18} color={colors.accent} />
+            </TouchableOpacity>
+          )}
+
+          {/* Direct Logout Button */}
           {user && (
             <TouchableOpacity
               onPress={handleLogout}
@@ -81,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
               ]}
               accessibilityLabel="Sign Out"
             >
-              <Ionicons name="log-out-outline" size={15} color={colors.danger} />
+              <AppIcon name="log-out-outline" size={15} color={colors.danger} />
             </TouchableOpacity>
           )}
         </View>
@@ -90,7 +111,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
       {/* Authenticated User Status Bar */}
       {user && (
         <View style={styles.userInfoRow}>
-          <View
+          <TouchableOpacity
+            onPress={onOpenProfile}
+            activeOpacity={0.8}
             style={[
               styles.userPill,
               {
@@ -99,7 +122,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
               },
             ]}
           >
-            <Ionicons
+            <AppIcon
               name={user.role === 'OWNER' ? 'storefront-outline' : 'person-outline'}
               size={12}
               color={user.role === 'OWNER' ? colors.accent : colors.success}
@@ -113,7 +136,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings }) => {
                 {user.role === 'OWNER' ? 'Owner' : 'Client'}
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -172,6 +195,14 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
