@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  salon-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: salon-management-api
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-db:5432/salondb
+      - SPRING_DATASOURCE_USERNAME=salonuser
+      - SPRING_DATASOURCE_PASSWORD=salonsecret
+      - SPRING_REDIS_HOST=redis-cache
+      - SPRING_REDIS_PORT=6379
+    depends_on:
+      - postgres-db
+      - redis-cache
+    restart: always
+
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: salon-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=salondb
+      - POSTGRES_USER=salonuser
+      - POSTGRES_PASSWORD=salonsecret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+
+  redis-cache:
+    image: redis:7-alpine
+    container_name: salon-redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+volumes:
+  pgdata:
