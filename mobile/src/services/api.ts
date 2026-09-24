@@ -1,15 +1,19 @@
 import { Platform } from 'react-native';
 import { Salon, SalonQueueDetails, QueueEntry } from '../types';
 
+const LIVE_RENDER_API = 'https://salonmanagement-h152.onrender.com/api';
+
 const getDefaultApiUrl = () => {
+  // If running in browser and pointing to localhost, can use localhost or live Render
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location && window.location.hostname) {
     const host = window.location.hostname;
-    if (host !== 'localhost' && host !== '127.0.0.1') {
-      return `http://${host}:8080/api`;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      // Connect to live Render API
+      return LIVE_RENDER_API;
     }
   }
-  // Default to computer's Wi-Fi LAN IP so physical phones can reach the Spring Boot backend
-  return 'http://192.168.31.224:8080/api';
+  // Default to live Render cloud API for all physical mobile devices (Android / iOS)
+  return LIVE_RENDER_API;
 };
 
 let BASE_URL = getDefaultApiUrl();
