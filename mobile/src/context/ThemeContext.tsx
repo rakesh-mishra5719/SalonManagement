@@ -1,5 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ThemeMode, DesignPattern } from '../types';
+import { storage } from '../services/storage';
+
+const THEME_STORAGE_KEY = 'salon_theme_mode';
 
 interface ThemeColors {
   background: string;
@@ -26,61 +29,63 @@ interface ThemeColors {
   buttonSecondaryText: string;
 }
 
+// Soft Neumorphic Light Palette
 const lightColors: ThemeColors = {
-  background: '#F9F9FB',
-  cardBg: 'rgba(255, 255, 255, 0.72)',
-  cardBorder: 'rgba(230, 230, 235, 0.8)',
-  textPrimary: '#111827',
-  textSecondary: '#6B7280',
-  textTertiary: '#9CA3AF',
+  background: '#EBEDF2',
+  cardBg: '#EBEDF2',
+  cardBorder: 'rgba(255, 255, 255, 0.9)',
+  textPrimary: '#1E232E',
+  textSecondary: '#64748B',
+  textTertiary: '#94A3B8',
   accent: '#18181B',
-  accentLight: 'rgba(24, 24, 27, 0.06)',
+  accentLight: 'rgba(24, 24, 27, 0.08)',
   accentText: '#FFFFFF',
   success: '#10B981',
-  successBg: 'rgba(16, 185, 129, 0.10)',
+  successBg: 'rgba(16, 185, 129, 0.12)',
   warning: '#F59E0B',
-  warningBg: 'rgba(245, 158, 11, 0.10)',
+  warningBg: 'rgba(245, 158, 11, 0.12)',
   danger: '#EF4444',
-  dangerBg: 'rgba(239, 68, 68, 0.10)',
-  divider: 'rgba(229, 231, 235, 0.7)',
+  dangerBg: 'rgba(239, 68, 68, 0.12)',
+  divider: 'rgba(209, 213, 219, 0.6)',
   glassGlow: 'rgba(255, 255, 255, 0.95)',
-  inputBg: 'rgba(255, 255, 255, 0.85)',
-  inputBorder: 'rgba(220, 225, 235, 0.9)',
-  surfaceMuted: '#F3F4F6',
-  buttonSecondaryBg: 'rgba(240, 242, 245, 0.8)',
+  inputBg: '#E2E5EE',
+  inputBorder: 'rgba(255, 255, 255, 0.85)',
+  surfaceMuted: '#E2E5EE',
+  buttonSecondaryBg: '#E2E5EE',
   buttonSecondaryText: '#374151',
 };
 
+// Soft Neumorphic Dark Onyx Palette
 const darkColors: ThemeColors = {
-  background: '#0B0D13',
-  cardBg: 'rgba(20, 24, 33, 0.70)',
+  background: '#12141A',
+  cardBg: '#161922',
   cardBorder: 'rgba(255, 255, 255, 0.08)',
-  textPrimary: '#F9FAFB',
-  textSecondary: '#9CA3AF',
-  textTertiary: '#6B7280',
-  accent: '#F9FAFB',
+  textPrimary: '#F8FAFC',
+  textSecondary: '#94A3B8',
+  textTertiary: '#64748B',
+  accent: '#F8FAFC',
   accentLight: 'rgba(255, 255, 255, 0.08)',
-  accentText: '#111827',
+  accentText: '#12141A',
   success: '#34D399',
-  successBg: 'rgba(52, 211, 153, 0.12)',
+  successBg: 'rgba(52, 211, 153, 0.14)',
   warning: '#FBBF24',
-  warningBg: 'rgba(251, 191, 36, 0.12)',
+  warningBg: 'rgba(251, 191, 36, 0.14)',
   danger: '#F87171',
-  dangerBg: 'rgba(248, 113, 113, 0.12)',
+  dangerBg: 'rgba(248, 113, 113, 0.14)',
   divider: 'rgba(255, 255, 255, 0.07)',
   glassGlow: 'rgba(255, 255, 255, 0.05)',
-  inputBg: 'rgba(25, 30, 42, 0.75)',
-  inputBorder: 'rgba(255, 255, 255, 0.12)',
-  surfaceMuted: '#151922',
-  buttonSecondaryBg: 'rgba(30, 35, 48, 0.8)',
-  buttonSecondaryText: '#E5E7EB',
+  inputBg: '#101217',
+  inputBorder: 'rgba(255, 255, 255, 0.08)',
+  surfaceMuted: '#1A1E29',
+  buttonSecondaryBg: '#1E2330',
+  buttonSecondaryText: '#E2E8F0',
 };
 
 interface ThemeContextType {
   mode: ThemeMode;
   toggleMode: () => void;
   designPattern: DesignPattern;
-  setDesignPattern: (pattern: DesignPattern) => void;
+  setDesignPattern?: (pattern: DesignPattern) => void;
   colors: ThemeColors;
   getCardStyle: () => any;
   getPillStyle: (active?: boolean) => any;
@@ -89,56 +94,56 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Minimalist light mode default as requested
-  const [mode, setMode] = useState<ThemeMode>('light');
-  // Glassmorphism design pattern default, user can change in settings
-  const [designPattern, setDesignPattern] = useState<DesignPattern>('glassmorphism');
+  // Synchronous web hydration for theme mode
+  const [mode, setMode] = useState<ThemeMode>(() => {
+    const sync = storage.getSync(THEME_STORAGE_KEY);
+    if (sync === 'dark' || sync === 'light') return sync;
+    return 'light';
+  });
+
+  // Universal restoration for native mobile platforms
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const stored = await storage.getItem(THEME_STORAGE_KEY);
+        if ((stored === 'dark' || stored === 'light') && isMounted) {
+          setMode(stored);
+        }
+      } catch (_) {}
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Fixed design pattern style: Soft Neumorphic permanently
+  const designPattern: DesignPattern = 'neumorphic';
 
   const toggleMode = () => {
-    setMode((prev) => (prev === 'light' ? 'dark' : 'light'));
+    setMode((prev) => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      storage.setItem(THEME_STORAGE_KEY, next).catch(() => {});
+      return next;
+    });
   };
 
   const colors = mode === 'light' ? lightColors : darkColors;
 
   const getCardStyle = () => {
-    if (designPattern === 'glassmorphism') {
-      return {
-        backgroundColor: colors.cardBg,
-        borderColor: colors.cardBorder,
-        borderWidth: 1,
-        borderRadius: 20,
-        shadowColor: mode === 'light' ? '#000000' : '#000000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: mode === 'light' ? 0.05 : 0.4,
-        shadowRadius: 16,
-        elevation: 3,
-        // Backdrop filter effect for web
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-      };
-    } else if (designPattern === 'flat-minimal') {
-      return {
-        backgroundColor: mode === 'light' ? '#FFFFFF' : '#141821',
-        borderColor: mode === 'light' ? '#E5E7EB' : '#272F3E',
-        borderWidth: 1,
-        borderRadius: 12,
-        shadowOpacity: 0,
-        elevation: 0,
-      };
-    } else {
-      // neumorphic
-      return {
-        backgroundColor: mode === 'light' ? '#F4F5F8' : '#13161F',
-        borderColor: mode === 'light' ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.06)',
-        borderWidth: 1.5,
-        borderRadius: 24,
-        shadowColor: mode === 'light' ? '#B8B9C0' : '#000000',
-        shadowOffset: { width: 4, height: 4 },
-        shadowOpacity: mode === 'light' ? 0.35 : 0.5,
-        shadowRadius: 8,
-        elevation: 4,
-      };
-    }
+    return {
+      backgroundColor: colors.cardBg,
+      borderColor: mode === 'light' ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.08)',
+      borderTopColor: mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.12)',
+      borderLeftColor: mode === 'light' ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.12)',
+      borderWidth: 1.5,
+      borderRadius: 22,
+      shadowColor: mode === 'light' ? '#B8B9C4' : '#000000',
+      shadowOffset: { width: 5, height: 6 },
+      shadowOpacity: mode === 'light' ? 0.38 : 0.55,
+      shadowRadius: 10,
+      elevation: 4,
+    };
   };
 
   const getPillStyle = (active = false) => {
@@ -147,12 +152,24 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         backgroundColor: colors.accent,
         borderColor: colors.accent,
         borderWidth: 1,
+        borderRadius: 20,
+        shadowColor: colors.accent,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 5,
+        elevation: 3,
       };
     }
     return {
-      backgroundColor: designPattern === 'glassmorphism' ? colors.cardBg : colors.surfaceMuted,
-      borderColor: colors.cardBorder,
+      backgroundColor: colors.surfaceMuted,
+      borderColor: mode === 'light' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.06)',
       borderWidth: 1,
+      borderRadius: 20,
+      shadowColor: mode === 'light' ? '#B8BDCF' : '#000000',
+      shadowOffset: { width: 2, height: 3 },
+      shadowOpacity: mode === 'light' ? 0.3 : 0.4,
+      shadowRadius: 4,
+      elevation: 2,
     };
   };
 
@@ -162,7 +179,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         mode,
         toggleMode,
         designPattern,
-        setDesignPattern,
+        setDesignPattern: () => {}, // No-op: Soft neumorphic is fixed
         colors,
         getCardStyle,
         getPillStyle,

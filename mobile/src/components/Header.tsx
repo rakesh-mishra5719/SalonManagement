@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert, Image } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { AppIcon } from './AppIcon';
@@ -27,9 +27,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenProfile })
       <View style={styles.topRow}>
         {/* Brand identity */}
         <View style={styles.brandContainer}>
-          <Text style={[styles.brandTitle, { color: colors.textPrimary }]}>AURA</Text>
-          <View style={[styles.microDot, { backgroundColor: colors.success }]} />
-          <Text style={[styles.brandSubtitle, { color: colors.textSecondary }]}>SALON ATELIER</Text>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.brandHeaderLogo}
+            resizeMode="contain"
+          />
+          <Text style={[styles.brandTitle, { color: colors.textPrimary }]}>HAJAMM</Text>
+          {/* <View style={[styles.microDot, { backgroundColor: colors.success }]} /> */}
         </View>
 
         {/* Action Controls */}
@@ -55,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenProfile })
           </TouchableOpacity>
 
           {/* Settings button */}
-          <TouchableOpacity
+          {/* <TouchableOpacity
             onPress={onOpenSettings}
             activeOpacity={0.7}
             style={[
@@ -65,10 +69,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenProfile })
                 backgroundColor: colors.surfaceMuted,
               },
             ]}
-            accessibilityLabel="Settings & Design Pattern"
+            accessibilityLabel="Settings & Preferences"
           >
             <AppIcon name="options-outline" size={15} color={colors.textPrimary} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           {/* USER REQUIREMENT: Top Right Corner User Icon (Click to open profile details) */}
           {user && (
@@ -89,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenProfile })
           )}
 
           {/* Direct Logout Button */}
-          {user && (
+          {/* {user && (
             <TouchableOpacity
               onPress={handleLogout}
               activeOpacity={0.7}
@@ -104,12 +108,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenProfile })
             >
               <AppIcon name="log-out-outline" size={15} color={colors.danger} />
             </TouchableOpacity>
-          )}
+          )} */}
         </View>
       </View>
 
       {/* Authenticated User Status Bar */}
-      {user && (
+      {/* {user && (
         <View style={styles.userInfoRow}>
           <TouchableOpacity
             onPress={onOpenProfile}
@@ -138,7 +142,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenProfile })
             </View>
           </TouchableOpacity>
         </View>
-      )}
+      )} */}
     </View>
   );
 };
@@ -158,6 +162,13 @@ const styles = StyleSheet.create({
   brandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  brandHeaderLogo: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    marginRight: 8,
+    backgroundColor: '#FFFFFF',
   },
   brandTitle: {
     fontSize: 19,

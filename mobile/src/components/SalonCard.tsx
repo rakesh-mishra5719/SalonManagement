@@ -11,7 +11,7 @@ interface SalonCardProps {
 }
 
 export const SalonCard: React.FC<SalonCardProps> = ({ salon, onBook, onSelect }) => {
-  const { colors, getCardStyle, designPattern } = useTheme();
+  const { colors, getCardStyle } = useTheme();
 
   const handleOpenGoogleMaps = () => {
     const lat = salon.latitude;
@@ -44,6 +44,14 @@ export const SalonCard: React.FC<SalonCardProps> = ({ salon, onBook, onSelect })
           <Text style={styles.badgeRatingText}>{salon.rating ? salon.rating.toFixed(1) : '4.8'}</Text>
         </View>
 
+        {/* Nearest & Quickest Highlight Badge */}
+        {salon.distanceKm !== undefined && salon.distanceKm <= 2.0 && (salon.waitingCount || 0) <= 1 && (
+          <View style={styles.badgeFastest}>
+            <Ionicons name="flash" size={10} color="#FFFFFF" style={{ marginRight: 3 }} />
+            <Text style={styles.badgeFastestText}>Nearest & Fastest</Text>
+          </View>
+        )}
+
         {/* Status Pill */}
         <View
           style={[
@@ -68,10 +76,10 @@ export const SalonCard: React.FC<SalonCardProps> = ({ salon, onBook, onSelect })
             </Text>
           </View>
           {salon.distanceKm !== undefined && (
-            <View style={[styles.distancePill, { backgroundColor: colors.accentLight }]}>
-              <Ionicons name="navigate-outline" size={11} color={colors.textPrimary} style={{ marginRight: 3 }} />
-              <Text style={[styles.distanceText, { color: colors.textPrimary }]}>
-                {salon.distanceKm} km
+            <View style={[styles.distancePill, { backgroundColor: colors.accentLight, borderColor: colors.cardBorder, borderWidth: 1 }]}>
+              <Ionicons name="navigate" size={11} color={colors.accent} style={{ marginRight: 3 }} />
+              <Text style={[styles.distanceText, { color: colors.textPrimary, fontWeight: '700' }]}>
+                {salon.distanceKm} km away
               </Text>
             </View>
           )}
@@ -95,10 +103,10 @@ export const SalonCard: React.FC<SalonCardProps> = ({ salon, onBook, onSelect })
             <View style={styles.queueLeft}>
               <Ionicons name="time-outline" size={13} color={colors.textSecondary} style={{ marginRight: 4 }} />
               <Text style={[styles.queueTitle, { color: colors.textSecondary }]}>
-                Live Waitlist:
+                Waitlist:
               </Text>
               <Text style={[styles.queueHighlight, { color: colors.textPrimary }]}>
-                {salon.waitingCount === 0 ? ' No wait' : ` ${salon.waitingCount} in queue`}
+                {salon.waitingCount === 0 ? ' No wait' : ` ${salon.waitingCount}`}
               </Text>
             </View>
             <Text style={[styles.queueEstimate, { color: colors.textSecondary }]}>
@@ -108,15 +116,11 @@ export const SalonCard: React.FC<SalonCardProps> = ({ salon, onBook, onSelect })
 
           {/* Visual Queue Indicator Dots */}
           <View style={styles.dotsRow}>
-            {waitDots.length > 0 ? (
+            {waitDots.length > 0 &&
               waitDots.map((_, idx) => (
                 <View key={idx} style={[styles.queueDot, { backgroundColor: colors.accent }]} />
               ))
-            ) : (
-              <View style={[styles.queueDotAvailable, { borderColor: colors.success }]}>
-                <Text style={[styles.availableText, { color: colors.success }]}>Immediate Seating</Text>
-              </View>
-            )}
+            }
           </View>
         </View>
 
@@ -222,6 +226,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.3,
+  },
+  badgeFastest: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D97706',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  badgeFastestText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   content: {
     padding: 16,

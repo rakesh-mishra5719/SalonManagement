@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking, Dimensions, Platform, DimensionValue } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Linking,
+  Platform,
+} from 'react-native';
 import { Salon } from '../types';
 import { useTheme } from '../context/ThemeContext';
+import { useApp } from '../context/AppContext';
 import { Ionicons } from '@expo/vector-icons';
+import { AppIcon } from './AppIcon';
 
 interface GoogleMapViewProps {
   salons: Salon[];
@@ -11,111 +21,186 @@ interface GoogleMapViewProps {
 
 export const GoogleMapView: React.FC<GoogleMapViewProps> = ({ salons, onBookSlot }) => {
   const { colors, getCardStyle } = useTheme();
+  const { userLocation } = useApp();
+
   const [selectedSalon, setSelectedSalon] = useState<Salon | null>(salons[0] || null);
+  const [mapType, setMapType] = useState<'m' | 'k'>('m'); // 'm' = Streets, 'k' = Satellite
 
   const handleOpenGoogleMapsDirections = (salon: Salon) => {
     const lat = salon.latitude;
     const lng = salon.longitude;
     const label = encodeURIComponent(salon.name);
-    // Standard Google Maps directions URI format
+    // Universal Google Maps directions URL
     const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${label}&travelmode=driving`;
     Linking.openURL(url).catch((err) => {
       console.error('Cannot open Google Maps:', err);
     });
   };
 
-  const topOffsets: DimensionValue[] = ['25%', '68%', '28%', '75%', '52%'];
-  const leftOffsets: DimensionValue[] = ['65%', '22%', '32%', '72%', '80%'];
+  const centerLat = selectedSalon ? selectedSalon.latitude : userLocation.lat;
+  const centerLng = selectedSalon ? selectedSalon.longitude : userLocation.lng;
+  const mapEmbedUrl = `https://maps.google.com/maps?q=${centerLat},${centerLng}&hl=en&z=15&t=${mapType}&output=embed`;
 
   return (
     <View style={styles.container}>
-      {/* Map Canvas Visual Area */}
-      <View style={[styles.mapCanvas, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
-        {/* Stylized Google Maps Grid Background */}
-        <View style={styles.gridLines}>
-          <View style={[styles.roadHorizontal, { top: '35%' }]} />
-          <View style={[styles.roadHorizontal, { top: '65%' }]} />
-          <View style={[styles.roadVertical, { left: '30%' }]} />
-          <View style={[styles.roadVertical, { left: '70%' }]} />
-          <View style={styles.metroParkArea} />
-        </View>
-
-        {/* User Location Pulse Marker */}
-        <View style={[styles.userMarkerContainer, { top: '48%', left: '46%' }]}>
-          <View style={styles.userPulseRing} />
-          <View style={styles.userCoreDot} />
-          <View style={[styles.userBadge, { backgroundColor: colors.accent }]}>
-            <Text style={[styles.userBadgeText, { color: colors.accentText }]}>You are here</Text>
+      {/* Top Controls: Google Maps Brand & Map Type Switcher */}
+      <View style={styles.topBar}>
+        <View style={styles.brandRow}>
+          <View style={styles.googleColorRow}>
+            <View style={[styles.googleColorBar, { backgroundColor: '#4285F4' }]} />
+            <View style={[styles.googleColorBar, { backgroundColor: '#EA4335' }]} />
+            <View style={[styles.googleColorBar, { backgroundColor: '#FBBC05' }]} />
+            <View style={[styles.googleColorBar, { backgroundColor: '#34A853' }]} />
           </View>
+          <Text style={[styles.brandText, { color: colors.textPrimary }]}>
+            Real Google Maps · Live
+          </Text>
         </View>
 
-        {/* Salon Location Pins */}
-        {salons.map((salon, index) => {
-          const isSelected = selectedSalon?.id === salon.id;
-          // Offset coordinates visually for schematic display
-          const top = topOffsets[index % topOffsets.length];
-          const left = leftOffsets[index % leftOffsets.length];
-
-          return (
-            <TouchableOpacity
-              key={salon.id}
-              activeOpacity={0.8}
-              onPress={() => setSelectedSalon(salon)}
+        {/* Map Type: Streets vs Satellite */}
+        <View style={[styles.mapTypeToggle, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setMapType('m')}
+            style={[
+              styles.mapTypeBtn,
+              mapType === 'm' && [styles.mapTypeBtnActive, { backgroundColor: colors.accent }],
+            ]}
+          >
+            <Text
               style={[
-                styles.pinWrapper,
-                { top, left },
-                isSelected && styles.pinWrapperSelected,
+                styles.mapTypeBtnText,
+                { color: mapType === 'm' ? colors.accentText : colors.textSecondary },
               ]}
             >
-              <View
-                style={[
-                  styles.pinMarker,
-                  {
-                    backgroundColor: isSelected ? colors.accent : (salon.isOpen ? '#10B981' : '#9CA3AF'),
-                    borderColor: '#FFFFFF',
-                  },
-                ]}
-              >
-                <Ionicons
-                  name={salon.isOpen ? 'cut' : 'pause'}
-                  size={12}
-                  color="#FFFFFF"
-                />
-              </View>
+              🗺️ Streets
+            </Text>
+          </TouchableOpacity>
 
-              {/* Pin Callout */}
-              <View
-                style={[
-                  styles.pinLabelBox,
-                  {
-                    backgroundColor: colors.cardBg,
-                    borderColor: colors.cardBorder,
-                  },
-                  isSelected && { borderColor: colors.accent, borderWidth: 1.5 },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.pinLabelText,
-                    { color: colors.textPrimary, fontWeight: isSelected ? '700' : '500' },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {salon.name.split(' ')[0]}
-                </Text>
-                <Text style={[styles.pinWaitText, { color: colors.textSecondary }]}>
-                  {salon.waitingCount} in line
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-
-        {/* Google Maps Brand Stamp */}
-        <View style={styles.mapAttribution}>
-          <Ionicons name="map" size={12} color={colors.textTertiary} style={{ marginRight: 4 }} />
-          <Text style={[styles.mapAttributionText, { color: colors.textTertiary }]}>Google Maps Radar</Text>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setMapType('k')}
+            style={[
+              styles.mapTypeBtn,
+              mapType === 'k' && [styles.mapTypeBtnActive, { backgroundColor: colors.accent }],
+            ]}
+          >
+            <Text
+              style={[
+                styles.mapTypeBtnText,
+                { color: mapType === 'k' ? colors.accentText : colors.textSecondary },
+              ]}
+            >
+              🛰️ Satellite
+            </Text>
+          </TouchableOpacity>
         </View>
+      </View>
+
+      {/* REAL GOOGLE MAP CONTAINER */}
+      <View style={[styles.mapWrapper, { borderColor: colors.cardBorder }]}>
+        {Platform.OS === 'web' ? (
+          React.createElement('iframe', {
+            title: 'Real Google Map Explorer',
+            src: mapEmbedUrl,
+            style: {
+              width: '100%',
+              height: 290,
+              border: 0,
+              borderRadius: 16,
+            },
+          })
+        ) : (
+          <View style={styles.nativeMapCanvas}>
+            <View style={styles.gridLineH1} />
+            <View style={styles.gridLineH2} />
+            <View style={styles.gridLineV1} />
+            <View style={styles.gridLineV2} />
+            <View style={styles.nativePinCenter}>
+              <View style={styles.pinOuterPulse} />
+              <View style={[styles.pinInnerDot, { backgroundColor: colors.accent }]} />
+              <View style={[styles.pinCallout, { backgroundColor: colors.cardBg }]}>
+                <Text style={[styles.pinCalloutText, { color: colors.textPrimary }]}>
+                  📍 {selectedSalon?.name || 'Selected Salon'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Live Coordinates Floating Pill on Map */}
+        <View style={styles.coordsFloatPill}>
+          <View style={styles.coordsPulseDot} />
+          <Text style={styles.coordsFloatText}>
+            {centerLat.toFixed(4)}°N, {centerLng.toFixed(4)}°E
+          </Text>
+        </View>
+      </View>
+
+      {/* Quick Salon Selector Chips */}
+      <View style={styles.carouselSection}>
+        <Text style={[styles.carouselTitle, { color: colors.textSecondary }]}>
+          TAP TO VIEW SALON ON REAL GOOGLE MAP ({salons.length} NEARBY):
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.carouselScroll}
+        >
+          {salons.map((salon) => {
+            const isSelected = selectedSalon?.id === salon.id;
+            return (
+              <TouchableOpacity
+                key={salon.id}
+                activeOpacity={0.8}
+                onPress={() => setSelectedSalon(salon)}
+                style={[
+                  styles.salonChip,
+                  {
+                    backgroundColor: isSelected ? colors.accent : colors.surfaceMuted,
+                    borderColor: isSelected ? colors.accent : colors.cardBorder,
+                  },
+                ]}
+              >
+                <View style={styles.chipTopRow}>
+                  <Text
+                    style={[
+                      styles.chipName,
+                      { color: isSelected ? colors.accentText : colors.textPrimary },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {salon.name}
+                  </Text>
+                  <View
+                    style={[
+                      styles.chipStatusDot,
+                      { backgroundColor: salon.isOpen ? '#10B981' : '#EF4444' },
+                    ]}
+                  />
+                </View>
+                <View style={styles.chipMetaRow}>
+                  <Text
+                    style={[
+                      styles.chipDistance,
+                      { color: isSelected ? colors.accentText : colors.textSecondary },
+                    ]}
+                  >
+                    📍 {salon.distanceKm ?? 0.8} km
+                  </Text>
+                  <Text
+                    style={[
+                      styles.chipWait,
+                      { color: isSelected ? colors.accentText : colors.textTertiary },
+                    ]}
+                  >
+                    · {salon.waitingCount ?? 0} in line
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* Selected Salon Floating Detail Card */}
@@ -124,13 +209,17 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({ salons, onBookSlot
           <View style={styles.cardHeader}>
             <View style={{ flex: 1 }}>
               <View style={styles.nameRow}>
-                <Text style={[styles.selectedName, { color: colors.textPrimary }]}>
+                <Text style={[styles.selectedName, { color: colors.textPrimary }]} numberOfLines={1}>
                   {selectedSalon.name}
                 </Text>
                 <View
                   style={[
                     styles.statusPill,
-                    { backgroundColor: selectedSalon.isOpen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)' },
+                    {
+                      backgroundColor: selectedSalon.isOpen
+                        ? 'rgba(16, 185, 129, 0.15)'
+                        : 'rgba(239, 68, 68, 0.15)',
+                    },
                   ]}
                 >
                   <Text
@@ -173,47 +262,29 @@ export const GoogleMapView: React.FC<GoogleMapViewProps> = ({ salons, onBookSlot
             <View style={styles.statCol}>
               <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Proximity</Text>
               <Text style={[styles.statValue, { color: colors.textPrimary }]}>
-                {selectedSalon.distanceKm || 0.8} km
+                {selectedSalon.distanceKm || 0.8} km away
               </Text>
             </View>
           </View>
 
-          {/* User Request: One button which navigates to Google Maps for directions */}
+          {/* Action Buttons: Google Maps Turn-by-Turn Navigation + Book Slot */}
           <View style={styles.buttonsRow}>
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => handleOpenGoogleMapsDirections(selectedSalon)}
-              style={[
-                styles.mapsNavButton,
-                {
-                  backgroundColor: '#4285F4', // Google Maps Iconic Blue
-                },
-              ]}
+              style={[styles.mapsNavButton, { backgroundColor: '#4285F4' }]}
             >
-              <Ionicons name="navigate" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.mapsNavButtonText}>Navigate via Google Maps</Text>
+              <Ionicons name="navigate" size={14} color="#FFFFFF" style={{ marginRight: 5 }} />
+              <Text style={styles.mapsNavButtonText}>Google Maps Directions</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => onBookSlot(selectedSalon)}
-              disabled={!selectedSalon.isOpen}
-              style={[
-                styles.bookSlotButton,
-                {
-                  backgroundColor: selectedSalon.isOpen ? colors.accent : colors.surfaceMuted,
-                  opacity: selectedSalon.isOpen ? 1 : 0.6,
-                },
-              ]}
+              style={[styles.bookButton, { backgroundColor: colors.accent }]}
             >
-              <Text
-                style={[
-                  styles.bookSlotButtonText,
-                  { color: selectedSalon.isOpen ? colors.accentText : colors.textSecondary },
-                ]}
-              >
-                Join Waitlist
-              </Text>
+              <Ionicons name="time" size={14} color={colors.accentText} style={{ marginRight: 5 }} />
+              <Text style={[styles.bookButtonText, { color: colors.accentText }]}>Book Slot</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -226,153 +297,162 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
-  mapCanvas: {
-    height: 320,
-    width: '100%',
-    borderRadius: 24,
-    borderWidth: 1,
-    overflow: 'hidden',
-    position: 'relative',
-    marginBottom: 14,
-  },
-  gridLines: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#F3F4F8',
-  },
-  roadHorizontal: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 14,
-    backgroundColor: '#E5E7EB',
-  },
-  roadVertical: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 14,
-    backgroundColor: '#E5E7EB',
-  },
-  metroParkArea: {
-    position: 'absolute',
-    top: '15%',
-    left: '8%',
-    width: 70,
-    height: 50,
-    borderRadius: 16,
-    backgroundColor: 'rgba(52, 211, 153, 0.18)',
-  },
-  userMarkerContainer: {
-    position: 'absolute',
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ translateX: -12 }, { translateY: -12 }],
+    marginBottom: 8,
   },
-  userPulseRing: {
-    position: 'absolute',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(59, 130, 246, 0.25)',
-  },
-  userCoreDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#3B82F6',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  userBadge: {
-    marginTop: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  userBadgeText: {
-    fontSize: 9,
-    fontWeight: '600',
-  },
-  pinWrapper: {
-    position: 'absolute',
-    alignItems: 'center',
-    transform: [{ translateX: -20 }, { translateY: -30 }],
-  },
-  pinWrapperSelected: {
-    zIndex: 10,
-    transform: [{ translateX: -20 }, { translateY: -34 }],
-  },
-  pinMarker: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  pinLabelBox: {
-    marginTop: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  pinLabelText: {
-    fontSize: 10,
-  },
-  pinWaitText: {
-    fontSize: 8,
-  },
-  mapAttribution: {
-    position: 'absolute',
-    bottom: 10,
-    left: 12,
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  mapAttributionText: {
+  googleColorRow: {
+    flexDirection: 'row',
+    marginRight: 6,
+    gap: 1.5,
+  },
+  googleColorBar: {
+    width: 3.5,
+    height: 10,
+    borderRadius: 1,
+  },
+  brandText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  mapTypeToggle: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 2,
+  },
+  mapTypeBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 6,
+  },
+  mapTypeBtnActive: {
+    elevation: 1,
+  },
+  mapTypeBtnText: {
     fontSize: 10,
-    letterSpacing: 0.4,
+    fontWeight: '700',
+  },
+  mapWrapper: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    position: 'relative',
+    height: 290,
+  },
+  coordsFloatPill: {
+    position: 'absolute',
+    bottom: 8,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+  },
+  coordsPulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+    marginRight: 6,
+  },
+  coordsFloatText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  carouselSection: {
+    marginTop: 10,
+  },
+  carouselTitle: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  carouselScroll: {
+    paddingRight: 16,
+    gap: 8,
+  },
+  salonChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    minWidth: 140,
+  },
+  chipTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  chipName: {
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 4,
+  },
+  chipStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  chipMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chipDistance: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  chipWait: {
+    fontSize: 10,
   },
   selectedCard: {
+    marginTop: 12,
     padding: 16,
-    width: '100%',
+    borderRadius: 18,
   },
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 10,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 3,
+    marginBottom: 2,
   },
   selectedName: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  selectedAddress: {
+    fontSize: 11,
   },
   statusPill: {
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 6,
   },
   statusPillText: {
     fontSize: 10,
-    fontWeight: '600',
-  },
-  selectedAddress: {
-    fontSize: 12,
+    fontWeight: '700',
   },
   ratingBox: {
     flexDirection: 'row',
@@ -380,18 +460,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(251, 191, 36, 0.15)',
     paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: 6,
   },
   ratingNumber: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
   statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+    paddingVertical: 10,
     borderTopWidth: 1,
-    paddingTop: 10,
-    marginBottom: 14,
+    marginBottom: 10,
   },
   statCol: {
     alignItems: 'center',
@@ -402,7 +482,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   buttonsRow: {
     flexDirection: 'row',
@@ -415,22 +495,90 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 11,
     borderRadius: 12,
-    elevation: 2,
   },
   mapsNavButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
-  bookSlotButton: {
+  bookButton: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 11,
     borderRadius: 12,
   },
-  bookSlotButtonText: {
-    fontSize: 12,
+  bookButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  nativeMapCanvas: {
+    height: 290,
+    backgroundColor: '#1E293B',
+    position: 'relative',
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridLineH1: {
+    position: 'absolute',
+    top: '35%',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  gridLineH2: {
+    position: 'absolute',
+    top: '65%',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  gridLineV1: {
+    position: 'absolute',
+    left: '35%',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  gridLineV2: {
+    position: 'absolute',
+    left: '65%',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  nativePinCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pinOuterPulse: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(56, 189, 248, 0.25)',
+  },
+  pinInnerDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  pinCallout: {
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  pinCalloutText: {
+    fontSize: 10,
     fontWeight: '700',
   },
 });

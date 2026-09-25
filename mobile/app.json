@@ -1,25 +1,43 @@
 {
   "expo": {
-    "name": "Salon Luxe & Minimal",
-    "slug": "salon-management-mobile",
+    "name": "HAJAMM",
+    "slug": "hajamm",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "backgroundColor": "#FAFAFA"
-    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.supportrakesh5719.salonmanagementmobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "HAJAMM needs access to your location to discover nearby salons and set your shop coordinates.",
+        "NSCameraUsageDescription": "HAJAMM allows salon owners to capture photos of their salon.",
+        "NSPhotoLibraryUsageDescription": "HAJAMM allows salon owners to upload photos of their salon from their photo library."
+      }
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#FAFAFA"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.supportrakesh5719.salonmanagementmobile"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "HAJAMM",
+      "shortName": "HAJAMM",
+      "themeColor": "#10B981",
+      "backgroundColor": "#FFFFFF",
+      "display": "standalone",
+      "orientation": "portrait"
     },
     "extra": {
       "eas": {

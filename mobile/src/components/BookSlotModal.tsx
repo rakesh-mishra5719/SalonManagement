@@ -9,6 +9,9 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Linking,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Salon, QueueEntry } from '../types';
 import { useTheme } from '../context/ThemeContext';
@@ -42,7 +45,7 @@ const availableServices = [
 ];
 
 export const BookSlotModal: React.FC<BookSlotModalProps> = ({ visible, salon, onClose }) => {
-  const { colors, getCardStyle, designPattern } = useTheme();
+  const { colors, getCardStyle } = useTheme();
   const { setActiveBooking, refreshSalons } = useApp();
   const { user } = useAuth();
 
@@ -78,14 +81,35 @@ export const BookSlotModal: React.FC<BookSlotModalProps> = ({ visible, salon, on
         userId: user?.id,
       });
 
-      setConfirmedBooking(entry);
-      setActiveBooking(entry);
+      const enrichedEntry: QueueEntry = {
+        ...entry,
+        salonId: salon.id,
+        salonName: salon.name,
+        salonAddress: salon.address,
+        latitude: salon.latitude,
+        longitude: salon.longitude,
+        salon: salon,
+      };
+
+      setConfirmedBooking(enrichedEntry);
+      setActiveBooking(enrichedEntry);
       refreshSalons();
     } catch (err: any) {
       Alert.alert('Booking Error', err.message || 'Unable to join queue');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleOpenGoogleMaps = () => {
+    if (!salon) return;
+    const lat = salon.latitude;
+    const lng = salon.longitude;
+    const label = encodeURIComponent(salon.name);
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${label}`;
+    Linking.openURL(url).catch((err) => {
+      console.error('Failed to open Google Maps:', err);
+    });
   };
 
   const handleDone = () => {
@@ -97,24 +121,33 @@ export const BookSlotModal: React.FC<BookSlotModalProps> = ({ visible, salon, on
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={[styles.dialog, getCardStyle()]}>
-          {/* Header */}
-          <View style={styles.headerRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
-                {confirmedBooking ? 'Booking Confirmed' : 'Select Slot & Waitlist'}
-              </Text>
-              <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
-                {salon.name}
-              </Text>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.overlay}>
+          <View style={[styles.dialog, getCardStyle()]}>
+            {/* Header */}
+            <View style={styles.headerRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
+                  {confirmedBooking ? 'Booking Confirmed' : 'Select Slot & Waitlist'}
+                </Text>
+                <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>
+                  {salon.name}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={handleDone} style={styles.closeBtn}>
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={handleDone} style={styles.closeBtn}>
-              <Ionicons name="close" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
 
-          <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.scrollArea}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+            >
             {confirmedBooking ? (
               /* Verification Pass Screen */
               <View style={styles.confirmedContainer}>
@@ -129,9 +162,14 @@ export const BookSlotModal: React.FC<BookSlotModalProps> = ({ visible, salon, on
                   ]}
                 >
                   <View style={styles.passHeader}>
-                    <Text style={[styles.passSalonName, { color: colors.textPrimary }]}>
-                      {salon.name}
-                    </Text>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={[styles.passSalonName, { color: colors.textPrimary }]}>
+                        {salon.name}
+                      </Text>
+                      <Text style={[styles.passSalonAddress, { color: colors.textSecondary }]}>
+                        📍 {salon.address}
+                      </Text>
+                    </View>
                     <View style={[styles.passVerifiedBadge, { backgroundColor: colors.successBg }]}>
                       <Text style={[styles.passVerifiedText, { color: colors.success }]}>
                         ACTIVE PASS
@@ -169,13 +207,25 @@ export const BookSlotModal: React.FC<BookSlotModalProps> = ({ visible, salon, on
                       </Text>
                     </View>
                     <View style={styles.passDetailCol}>
-                      <Text style={[styles.passDetailLabel, { color: colors.textTertiary }]}>Guest</Text>
+                      <Text style={[styles.passDetailLabel, { color: colors.textTertiary }]}>Service</Text>
                       <Text style={[styles.passDetailValue, { color: colors.textPrimary }]}>
-                        {confirmedBooking.customerName}
+                        {confirmedBooking.serviceName || selectedService}
                       </Text>
                     </View>
                   </View>
                 </View>
+
+                {/* Real Google Maps Navigation Button */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleOpenGoogleMaps}
+                  style={styles.googleMapsNavBtn}
+                >
+                  <Ionicons name="navigate-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.googleMapsNavBtnText}>
+                    Navigate to Salon (Google Maps)
+                  </Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                   activeOpacity={0.8}
@@ -321,6 +371,7 @@ export const BookSlotModal: React.FC<BookSlotModalProps> = ({ visible, salon, on
           </ScrollView>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -445,8 +496,34 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   passSalonName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
+    marginBottom: 2,
+  },
+  passSalonAddress: {
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  googleMapsNavBtn: {
+    backgroundColor: '#9A6B39',
+    height: 48,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    shadowColor: '#9A6B39',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  googleMapsNavBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   passVerifiedBadge: {
     paddingHorizontal: 8,

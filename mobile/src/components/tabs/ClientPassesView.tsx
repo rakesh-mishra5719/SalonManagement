@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { AppIcon } from '../AppIcon';
+import { Ionicons } from '@expo/vector-icons';
 
 interface ClientPassesViewProps {
   onGoToExplore: () => void;
@@ -12,11 +13,23 @@ interface ClientPassesViewProps {
 export const ClientPassesView: React.FC<ClientPassesViewProps> = ({ onGoToExplore }) => {
   const { colors, getCardStyle } = useTheme();
   const { user } = useAuth();
-  const { activeBooking, salons } = useApp();
+  const { activeBooking, setActiveBooking, salons } = useApp();
 
   const bookedSalon = activeBooking
     ? salons.find((s) => s.id === activeBooking.salonId)
     : null;
+
+  const handleOpenGoogleMaps = () => {
+    if (!activeBooking) return;
+    const s = activeBooking.salon || salons.find((item) => item.id === activeBooking.salonId);
+    const lat = activeBooking.latitude || s?.latitude || 12.9716;
+    const lng = activeBooking.longitude || s?.longitude || 77.5946;
+    const label = encodeURIComponent(activeBooking.salonName || s?.name || 'Salon');
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${label}`;
+    Linking.openURL(url).catch((err) => {
+      console.error('Failed to open Google Maps:', err);
+    });
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -37,18 +50,19 @@ export const ClientPassesView: React.FC<ClientPassesViewProps> = ({ onGoToExplor
               <Text style={[styles.statusText, { color: colors.textPrimary }]}>ACTIVE PASS</Text>
             </View>
             <Text style={[styles.salonCategory, { color: colors.textTertiary }]}>
-              {bookedSalon?.category || 'HAIR & GROOMING'}
+              {activeBooking.salon?.category || bookedSalon?.category || 'HAIR & GROOMING'}
             </Text>
           </View>
 
+          {/* Booked Salon Name */}
           <Text style={[styles.passSalonName, { color: colors.textPrimary }]}>
-            {bookedSalon?.name || 'Partner Salon'}
+            {activeBooking.salonName || activeBooking.salon?.name || bookedSalon?.name || 'HAJAMM Partner Salon'}
           </Text>
-          {bookedSalon && (
-            <Text style={[styles.passSalonAddress, { color: colors.textSecondary }]}>
-              📍 {bookedSalon.address}
-            </Text>
-          )}
+
+          {/* Booked Salon Address */}
+          <Text style={[styles.passSalonAddress, { color: colors.textSecondary }]}>
+            📍 {activeBooking.salonAddress || activeBooking.salon?.address || bookedSalon?.address || 'Address provided at booking'}
+          </Text>
 
           {/* 6-Digit Code Highlight */}
           <View
@@ -85,10 +99,32 @@ export const ClientPassesView: React.FC<ClientPassesViewProps> = ({ onGoToExplor
             <View style={styles.metaItem}>
               <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>SLOT TIME</Text>
               <Text style={[styles.metaValue, { color: colors.textPrimary }]}>
-                {activeBooking.slotTime || 'Now'}
+                {activeBooking.slotTime || 'Scheduled'}
               </Text>
             </View>
           </View>
+
+          {/* Real Google Maps Navigation Button */}
+          <TouchableOpacity
+            onPress={handleOpenGoogleMaps}
+            style={styles.directionsBtn}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="navigate-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.directionsBtnText}>Navigate to Salon (Google Maps)</Text>
+          </TouchableOpacity>
+
+          {/* Dismiss Pass Button */}
+          <TouchableOpacity
+            onPress={() => setActiveBooking(null)}
+            style={[styles.dismissPassBtn, { borderColor: colors.cardBorder }]}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="checkmark-done" size={15} color={colors.textSecondary} style={{ marginRight: 6 }} />
+            <Text style={[styles.dismissPassText, { color: colors.textSecondary }]}>
+              Dismiss / Complete Pass
+            </Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <View
@@ -269,6 +305,40 @@ const styles = StyleSheet.create({
   metaValue: {
     fontSize: 13,
     fontWeight: '700',
+  },
+  directionsBtn: {
+    backgroundColor: '#9A6B39',
+    height: 48,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 18,
+    marginBottom: 8,
+    shadowColor: '#9A6B39',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  directionsBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  dismissPassBtn: {
+    height: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  dismissPassText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   emptyCard: {
     borderRadius: 20,

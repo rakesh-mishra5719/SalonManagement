@@ -10,7 +10,6 @@ import {
   Platform,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-import { DesignPattern } from '../types';
 import { getApiBaseUrl, setApiBaseUrl } from '../services/api';
 import { useApp } from '../context/AppContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +20,7 @@ interface SettingsModalProps {
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }) => {
-  const { mode, toggleMode, designPattern, setDesignPattern, colors, getCardStyle } = useTheme();
+  const { mode, toggleMode, colors, getCardStyle } = useTheme();
   const { refreshSalons } = useApp();
   const [serverUrl, setServerUrl] = useState(getApiBaseUrl());
 
@@ -30,27 +29,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
     refreshSalons();
     onClose();
   };
-
-  const patternOptions: { id: DesignPattern; label: string; desc: string; icon: any }[] = [
-    {
-      id: 'glassmorphism',
-      label: 'Glassmorphism',
-      desc: 'Translucent frosted glass with blurred backdrops & luminous borders',
-      icon: 'sparkles-outline',
-    },
-    {
-      id: 'flat-minimal',
-      label: 'Minimal Flat',
-      desc: 'Clean stark surfaces, sharp borders & ultra-airy typography',
-      icon: 'square-outline',
-    },
-    {
-      id: 'neumorphic',
-      label: 'Soft Neumorphic',
-      desc: 'Soft tactile bevels, gentle diffused shadows & embossed depth',
-      icon: 'layers-outline',
-    },
-  ];
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -61,7 +39,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: colors.textPrimary }]}>Settings</Text>
               <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                Design Patterns & Core Preferences
+                Preferences & Server Connection
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -70,67 +48,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ visible, onClose }
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Design Pattern Selection (User Request) */}
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-              Design Pattern Style
-            </Text>
-            <Text style={[styles.sectionDesc, { color: colors.textTertiary }]}>
-              Customize the surface styling and reflection depth
-            </Text>
-
-            {patternOptions.map((opt) => {
-              const isSelected = designPattern === opt.id;
-              return (
-                <TouchableOpacity
-                  key={opt.id}
-                  activeOpacity={0.7}
-                  onPress={() => setDesignPattern(opt.id)}
-                  style={[
-                    styles.patternCard,
-                    {
-                      backgroundColor: isSelected ? colors.accentLight : colors.surfaceMuted,
-                      borderColor: isSelected ? colors.accent : colors.cardBorder,
-                    },
-                  ]}
-                >
-                  <View style={styles.patternIconBox}>
-                    <Ionicons
-                      name={opt.icon}
-                      size={18}
-                      color={isSelected ? colors.accent : colors.textSecondary}
-                    />
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[
-                        styles.patternTitle,
-                        {
-                          color: colors.textPrimary,
-                          fontWeight: isSelected ? '700' : '600',
-                        },
-                      ]}
-                    >
-                      {opt.label}
-                    </Text>
-                    <Text style={[styles.patternDesc, { color: colors.textSecondary }]}>
-                      {opt.desc}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      { borderColor: isSelected ? colors.accent : colors.textTertiary },
-                    ]}
-                  >
-                    {isSelected && (
-                      <View style={[styles.radioDot, { backgroundColor: colors.accent }]} />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+            {/* Fixed Design Style Notice */}
+            <View
+              style={[
+                styles.styleBanner,
+                {
+                  backgroundColor: colors.surfaceMuted,
+                  borderColor: colors.cardBorder,
+                },
+              ]}
+            >
+              <View style={[styles.styleIconBox, { backgroundColor: colors.accentLight }]}>
+                <Ionicons name="layers-outline" size={18} color={colors.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.styleBannerTitle, { color: colors.textPrimary }]}>
+                  Soft Neumorphic Design
+                </Text>
+                <Text style={[styles.styleBannerSub, { color: colors.textSecondary }]}>
+                  Fixed default tactile bevels & embossed ambient depth
+                </Text>
+              </View>
+            </View>
 
             {/* Theme Mode Switch */}
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
@@ -237,42 +176,31 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginBottom: 10,
   },
-  patternCard: {
+  styleBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 14,
+    padding: 14,
+    borderRadius: 16,
     borderWidth: 1,
+    marginTop: 6,
     marginBottom: 8,
-    gap: 10,
+    gap: 12,
   },
-  patternIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+  styleIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  patternTitle: {
+  styleBannerTitle: {
     fontSize: 13,
+    fontWeight: '700',
     marginBottom: 2,
   },
-  patternDesc: {
-    fontSize: 10,
-    lineHeight: 14,
-  },
-  radioCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  styleBannerSub: {
+    fontSize: 11,
+    lineHeight: 15,
   },
   themeRow: {
     flexDirection: 'row',

@@ -9,6 +9,7 @@ import { ProfileModal } from './src/components/ProfileModal';
 import { SettingsModal } from './src/screens/SettingsModal';
 import { BottomTabBar } from './src/components/BottomTabBar';
 
+import { SplashScreen } from './src/components/SplashScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { CustomerScreen } from './src/screens/CustomerScreen';
 import { OwnerScreen } from './src/screens/OwnerScreen';
@@ -46,8 +47,12 @@ const AppNavigator: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
+  // Splash screen state: show HAJAMM logo while opening app
+  const [showSplash, setShowSplash] = useState(true);
+  const [isSplashDone, setIsSplashDone] = useState(false);
+
   // Active tab state: 4 tabs tailored to role
-  const [currentTab, setCurrentTab] = useState<string>('explore');
+  const [currentTab, setCurrentTab] = useState<string>(() => (user?.role === 'OWNER' ? 'queue' : 'explore'));
 
   // Reset tab when user role changes
   useEffect(() => {
@@ -58,11 +63,20 @@ const AppNavigator: React.FC = () => {
     }
   }, [user?.role]);
 
-  if (loading) {
+  // When splash duration finishes and auth is done loading, dismiss splash
+  useEffect(() => {
+    if (isSplashDone && !loading) {
+      setShowSplash(false);
+    }
+  }, [isSplashDone, loading]);
+
+  // Show official HAJAMM logo splash screen while app is opening or restoring auth
+  if (showSplash || loading) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.accent} />
-      </View>
+      <SplashScreen
+        minDurationMs={2000}
+        onFinish={() => setIsSplashDone(true)}
+      />
     );
   }
 

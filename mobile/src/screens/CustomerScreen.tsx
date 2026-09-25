@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ScrollView,
   Platform,
+  Linking,
 } from 'react-native';
 import { Salon } from '../types';
 import { useTheme } from '../context/ThemeContext';
@@ -17,33 +18,30 @@ import { SalonCard } from '../components/SalonCard';
 import { GoogleMapView } from '../components/GoogleMapView';
 import { BookSlotModal } from '../components/BookSlotModal';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 
 export const CustomerScreen: React.FC = () => {
   const { colors, getCardStyle } = useTheme();
-  const { salons, loading, refreshSalons, activeBooking, setActiveBooking } = useApp();
+  const {
+    salons,
+    loading,
+    refreshSalons,
+    activeBooking,
+    setActiveBooking,
+    userLocation,
+    gpsActive,
+    requestAndFetchUserLocation,
+  } = useApp();
 
   const [activeTab, setActiveTab] = useState<'list' | 'map'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [bookingSalon, setBookingSalon] = useState<Salon | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [gpsLocation, setGpsLocation] = useState<string>('Detecting nearby salons...');
 
-  // User Requirement: App asks access current location
+  // Automatically request GPS access every time user opens or enters screen
   React.useEffect(() => {
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setGpsLocation(`GPS Active: ${pos.coords.latitude.toFixed(2)}°N, ${pos.coords.longitude.toFixed(2)}°E`);
-        },
-        () => {
-          setGpsLocation('Bengaluru Metropolitan Hub (Default Location)');
-        },
-        { enableHighAccuracy: true, timeout: 6000 }
-      );
-    } else {
-      setGpsLocation('Location Active');
-    }
-  }, []);
+    requestAndFetchUserLocation();
+  }, [requestAndFetchUserLocation]);
 
   const filteredSalons = salons.filter(
     (s) =>
@@ -60,12 +58,14 @@ export const CustomerScreen: React.FC = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* GPS Location Notification Pill */}
-      <View style={styles.locationHeaderRow}>
+      {/* <View style={styles.locationHeaderRow}>
         <Ionicons name="location" size={12} color={colors.accent} style={{ marginRight: 5 }} />
         <Text style={[styles.locationHeaderText, { color: colors.textSecondary }]}>
-          {gpsLocation}
+          {gpsActive
+            ? `📍 GPS Active (${userLocation.lat.toFixed(2)}°N, ${userLocation.lng.toFixed(2)}°E) · Closest First`
+            : '📍 Locating nearby salons...'}
         </Text>
-      </View>
+      </View> */}
       {/* Search & View Switcher */}
       <View style={styles.topControls}>
         {/* Search Bar */}
@@ -151,20 +151,56 @@ export const CustomerScreen: React.FC = () => {
               <View style={styles.bannerBadgeRow}>
                 <View style={[styles.bannerLiveDot, { backgroundColor: colors.success }]} />
                 <Text style={[styles.bannerBadgeText, { color: colors.success }]}>
-                  CONFIRMED WAITLIST PASS
+                  CONFIRMED WAITLIST PASS • #{activeBooking.queuePosition || 1} IN QUEUE
                 </Text>
               </View>
-              <Text style={[styles.bannerCode, { color: colors.textPrimary }]}>
-                {activeBooking.verificationCode}
+
+              {/* Booked Salon Name & Address */}
+              <Text style={[styles.bannerSalonName, { color: colors.textPrimary }]}>
+                {activeBooking.salonName || activeBooking.salon?.name || salons.find(s => s.id === activeBooking.salonId)?.name || 'Booked Salon'}
               </Text>
-              <Text style={[styles.bannerSub, { color: colors.textSecondary }]}>
-                Slot: {activeBooking.slotTime} • Position #{activeBooking.queuePosition || 1} in queue
+              <Text style={[styles.bannerSalonAddress, { color: colors.textSecondary }]}>
+                📍 {activeBooking.salonAddress || activeBooking.salon?.address || salons.find(s => s.id === activeBooking.salonId)?.address || 'Address provided at booking'}
               </Text>
+
+              {/* Arrival Code & Slot Time Box */}
+              <View style={[styles.bannerCodeWrap, { backgroundColor: colors.surfaceMuted, borderColor: colors.cardBorder }]}>
+                <View>
+                  <Text style={[styles.bannerCodeLabel, { color: colors.textTertiary }]}>ARRIVAL CODE</Text>
+                  <Text style={[styles.bannerCode, { color: colors.accent }]}>
+                    {activeBooking.verificationCode}
+                  </Text>
+                </View>
+                <View style={{ marginLeft: 16 }}>
+                  <Text style={[styles.bannerCodeLabel, { color: colors.textTertiary }]}>SLOT & SERVICE</Text>
+                  <Text style={[styles.bannerSub, { color: colors.textPrimary }]}>
+                    {activeBooking.slotTime || 'Scheduled'} • {activeBooking.serviceName || 'Service'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Real Google Maps Navigation Button with Location Icon */}
+              <TouchableOpacity
+                onPress={() => {
+                  const s = activeBooking.salon || salons.find(item => item.id === activeBooking.salonId);
+                  const lat = activeBooking.latitude || s?.latitude || 12.9716;
+                  const lng = activeBooking.longitude || s?.longitude || 77.5946;
+                  const name = encodeURIComponent(activeBooking.salonName || s?.name || 'Salon');
+                  const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&destination_place_id=${name}`;
+                  Linking.openURL(url).catch((err) => console.error('Failed to open Google Maps:', err));
+                }}
+                style={styles.bannerMapsBtn}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="navigate-circle" size={17} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.bannerMapsBtnText}>Navigate to Salon (Google Maps)</Text>
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity
               onPress={() => setActiveBooking(null)}
               style={[styles.dismissBtn, { borderColor: colors.cardBorder }]}
+              accessibilityLabel="Dismiss Pass Banner"
             >
               <Ionicons name="close" size={14} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -185,9 +221,9 @@ export const CustomerScreen: React.FC = () => {
               <Text style={[styles.listHeaderTitle, { color: colors.textPrimary }]}>
                 Salons Near You
               </Text>
-              <Text style={[styles.listHeaderSub, { color: colors.textSecondary }]}>
+              {/* <Text style={[styles.listHeaderSub, { color: colors.textSecondary }]}>
                 Live waiting times & instant code booking
-              </Text>
+              </Text> */}
             </View>
           }
           renderItem={({ item }) => (
@@ -302,14 +338,58 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.6,
   },
+  bannerSalonName: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  bannerSalonAddress: {
+    fontSize: 11,
+    marginBottom: 8,
+  },
+  bannerCodeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  bannerCodeLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
   bannerCode: {
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 1.5,
-    marginVertical: 2,
   },
   bannerSub: {
     fontSize: 11,
+    fontWeight: '600',
+  },
+  bannerMapsBtn: {
+    backgroundColor: '#9A6B39',
+    height: 40,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    shadowColor: '#9A6B39',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  bannerMapsBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   dismissBtn: {
     width: 28,
@@ -318,6 +398,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'flex-start',
+    marginLeft: 8,
   },
   listHeader: {
     paddingHorizontal: 16,

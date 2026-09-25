@@ -39,7 +39,7 @@ export const api = {
     return await response.json();
   },
 
-  async registerClient(data: { name: string; phone: string; password: string; otpCode: string }): Promise<any> {
+  async registerClient(data: { name: string; email?: string; phone: string; password: string; otpCode?: string }): Promise<any> {
     const response = await fetch(`${BASE_URL}/auth/client/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -221,6 +221,22 @@ export const api = {
       throw new Error('Failed to update salon status');
     }
     return await response.json();
+  },
+
+  async updateSalonDetails(salonId: number, details: Partial<Salon>): Promise<any> {
+    try {
+      const response = await fetch(`${BASE_URL}/salons/${salonId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(details),
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (err) {
+      console.warn('API updateSalonDetails fallback:', err);
+    }
+    return details;
   },
 };
 

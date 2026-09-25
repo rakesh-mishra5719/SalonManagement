@@ -10,19 +10,26 @@ import {
   Switch,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../context/ThemeContext';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { SalonQueueDetails, QueueEntry } from '../types';
 import { AppIcon } from '../components/AppIcon';
+import { EditSalonModal } from '../components/EditSalonModal';
+
+const DEFAULT_BRAND_IMAGE =
+  'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80';
 
 export const OwnerScreen: React.FC = () => {
   const { colors, getCardStyle } = useTheme();
-  const { salons, refreshSalons } = useApp();
-  const { user } = useAuth();
+  const { salons, refreshSalons, updateSalonPhoto, updateSalonDetails } = useApp();
+  const { user, updateUserSalon } = useAuth();
 
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const [queueDetails, setQueueDetails] = useState<SalonQueueDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [codeInput, setCodeInput] = useState('');
@@ -33,12 +40,22 @@ export const OwnerScreen: React.FC = () => {
     entry?: QueueEntry;
   } | null>(null);
 
-  // Strictly lock to the authenticated owner's salon - no other salons shown
+  // Strictly lock to the authenticated owner's salon, checking live salons state first
   const activeSalon =
-    user?.salon ||
     (user?.salonId ? salons.find((s) => s.id === user.salonId) : null) ||
+    (user?.salon?.id ? salons.find((s) => s.id === user?.salon?.id) : null) ||
     salons.find((s) => s.ownerId === user?.id) ||
+    user?.salon ||
     salons[0];
+
+  // Dedicated reactive state for the open/close toggle so switch reflects immediately
+  const [isOpen, setIsOpen] = useState<boolean>(() => Boolean(activeSalon?.isOpen));
+
+  useEffect(() => {
+    if (activeSalon) {
+      setIsOpen(Boolean(activeSalon.isOpen));
+    }
+  }, [activeSalon?.isOpen]);
 
   const fetchQueue = async () => {
     if (!activeSalon) return;
@@ -61,12 +78,20 @@ export const OwnerScreen: React.FC = () => {
 
   const handleToggleOpen = async (value: boolean) => {
     if (!activeSalon) return;
+    // 1. Immediate optimistic UI reflection
+    setIsOpen(value);
     try {
+      // 2. Persist in universal storage & AppContext
+      await updateSalonDetails(activeSalon.id, { isOpen: value });
+      // 3. Persist in AuthContext user session
+      updateUserSalon({ isOpen: value });
+      // 4. Send to backend API
       await api.updateSalonStatus(activeSalon.id, value);
+      // 5. Sync queue and salons
       await fetchQueue();
       await refreshSalons();
     } catch (err: any) {
-      Alert.alert('Status Error', err.message || 'Failed to update salon status');
+      console.warn('Failed to update salon status:', err);
     }
   };
 
@@ -110,6 +135,93 @@ export const OwnerScreen: React.FC = () => {
     }
   };
 
+  const [photoLoading, setPhotoLoading] = useState(false);
+
+  const currentPhotoUrl = activeSalon?.imageUrl || DEFAULT_BRAND_IMAGE;
+  const hasCustomPhoto = Boolean(
+    activeSalon?.imageUrl && activeSalon.imageUrl !== DEFAULT_BRAND_IMAGE
+  );
+
+  const handleTakePhoto = async () => {
+    if (!activeSalon) return;
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Permission Required',
+          'Camera access is required to take a photo of your salon.'
+        );
+        return;
+      }
+
+      setPhotoLoading(true);
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const photoUri = result.assets[0].uri;
+        await updateSalonPhoto(activeSalon.id, photoUri);
+        await refreshSalons();
+        Alert.alert('Salon Photo Updated', 'Your new salon photo has been saved and will appear to customers!');
+      }
+    } catch (err: any) {
+      Alert.alert('Camera Error', err.message || 'Failed to capture photo');
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
+
+  const handlePickFromGallery = async () => {
+    if (!activeSalon) return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Permission Required',
+          'Photo library access is required to select a salon photo.'
+        );
+        return;
+      }
+
+      setPhotoLoading(true);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const photoUri = result.assets[0].uri;
+        await updateSalonPhoto(activeSalon.id, photoUri);
+        await refreshSalons();
+        Alert.alert('Salon Photo Updated', 'Your new salon photo has been saved and will appear to customers!');
+      }
+    } catch (err: any) {
+      Alert.alert('Gallery Error', err.message || 'Failed to select photo');
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
+
+  const handleResetPhoto = async () => {
+    if (!activeSalon) return;
+    try {
+      setPhotoLoading(true);
+      await updateSalonPhoto(activeSalon.id, null);
+      await refreshSalons();
+      Alert.alert('Reset to Brand Image', 'Your salon photo has been reset to our official brand image.');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to reset photo');
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -120,19 +232,15 @@ export const OwnerScreen: React.FC = () => {
       showsVerticalScrollIndicator={false}
     >
       {/* Dedicated Owner Salon Profile Card (Strictly only owner's registered salon) */}
-      <View style={[styles.salonHeaderCard, getCardStyle()]}>
+      {/* <View style={[styles.salonHeaderCard, getCardStyle()]}>
         <View style={styles.salonHeaderTop}>
           <View style={{ flex: 1 }}>
             <View style={styles.ownerBadgeRow}>
-              <View style={[styles.verifiedTag, { backgroundColor: colors.accentLight }]}>
-                <AppIcon name="shield-checkmark-outline" size={11} color={colors.accent} />
-                <Text style={[styles.verifiedTagText, { color: colors.textPrimary }]}>
-                  OWNER WORKSPACE
-                </Text>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+               
+
               </View>
-              <Text style={[styles.ownerIdText, { color: colors.textTertiary }]}>
-                Shop ID #{activeSalon?.id || 1}
-              </Text>
             </View>
             <Text style={[styles.salonTitle, { color: colors.textPrimary }]}>
               {activeSalon?.name || user?.salon?.name || 'Your Salon'}
@@ -145,56 +253,56 @@ export const OwnerScreen: React.FC = () => {
             </Text>
           </View>
         </View>
-      </View>
+      </View> */}
 
-      {/* Salon Open/Closed Status Card */}
-      {activeSalon && (
-        <View style={[styles.statusCard, getCardStyle()]}>
-          <View style={styles.statusRow}>
-            <View style={{ flex: 1 }}>
-              <View style={styles.statusLabelRow}>
-                <View
-                  style={[
-                    styles.statusIndicator,
-                    { backgroundColor: activeSalon.isOpen ? colors.success : colors.danger },
-                  ]}
-                />
-                <Text style={[styles.statusTitle, { color: colors.textPrimary }]}>
-                  {activeSalon.isOpen ? 'Shop is Open (Morning Hours)' : 'Shop is Closed (Evening Hours)'}
-                </Text>
-              </View>
-              <Text style={[styles.statusSub, { color: colors.textSecondary }]}>
-                {activeSalon.isOpen
-                  ? 'Open for walk-ins & appointments today. Tap switch to close this evening.'
-                  : 'Closed for the night. Tap switch every morning to open your shop.'}
-              </Text>
-            </View>
 
-            <Switch
-              value={activeSalon.isOpen}
-              onValueChange={handleToggleOpen}
-              trackColor={{ false: '#D1D5DB', true: colors.success }}
-              thumbColor="#FFFFFF"
-            />
+       {/* Live Actual User Counter Dashboard */}
+      <View style={styles.metricsContainer}>
+        <Text style={[styles.metricsTitle, { color: colors.textPrimary }]}>
+          Live User Count
+        </Text>
+        <View style={styles.metricsGrid}>
+          <View style={[styles.metricCard, getCardStyle()]}>
+            <Text style={[styles.metricNum, { color: colors.success }]}>
+              {queueDetails?.servingCount ?? 0}
+            </Text>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              Serving Now
+            </Text>
+          </View>
+
+          <View style={[styles.metricCard, getCardStyle()]}>
+            <Text style={[styles.metricNum, { color: colors.warning }]}>
+              {queueDetails?.waitingCount ?? 0}
+            </Text>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              In Waiting Line
+            </Text>
+          </View>
+
+          <View style={[styles.metricCard, getCardStyle()]}>
+            <Text style={[styles.metricNum, { color: colors.textPrimary }]}>
+              {queueDetails?.completedTodayCount ?? 0}
+            </Text>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              Finished Today
+            </Text>
           </View>
         </View>
-      )}
+      </View>
 
       {/* Code Verification Box */}
       <View style={[styles.verifyCard, getCardStyle()]}>
         <View style={styles.verifyHeader}>
-          <AppIcon name="shield-checkmark-outline" size={18} color={colors.accent} style={{ marginRight: 6 }} />
+          <AppIcon name="shield-checkmark-outline" size={18} color={colors.accent} style={{ marginRight: 6, marginBottom: 12 }} />
           <Text style={[styles.verifyTitle, { color: colors.textPrimary }]}>
-            Verify Arriving Client (6-Digit Code)
+            Verify Arriving Client
           </Text>
         </View>
-        <Text style={[styles.verifySub, { color: colors.textSecondary }]}>
-          When a client arrives, enter their 6-digit verification code to confirm their slot and admit them to the styling chair.
-        </Text>
 
         <View style={styles.inputRow}>
           <TextInput
-            placeholder="Enter 6-Digit Code (e.g. 849201)"
+            placeholder="Enter 6-Digit Code "
             placeholderTextColor={colors.textTertiary}
             value={codeInput}
             onChangeText={setCodeInput}
@@ -221,7 +329,7 @@ export const OwnerScreen: React.FC = () => {
             {verifying ? (
               <ActivityIndicator color={colors.accentText} size="small" />
             ) : (
-              <Text style={[styles.verifyBtnText, { color: colors.accentText }]}>Admit Client</Text>
+              <Text style={[styles.verifyBtnText, { color: colors.accentText }]}>Confirm</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -254,44 +362,8 @@ export const OwnerScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Live Actual User Counter Dashboard */}
-      <View style={styles.metricsContainer}>
-        <Text style={[styles.metricsTitle, { color: colors.textPrimary }]}>
-          Live Actual User Count
-        </Text>
-        <Text style={[styles.metricsSubtitle, { color: colors.textSecondary }]}>
-          Real-time synchronized across all customer devices
-        </Text>
 
-        <View style={styles.metricsGrid}>
-          <View style={[styles.metricCard, getCardStyle()]}>
-            <Text style={[styles.metricNum, { color: colors.success }]}>
-              {queueDetails?.servingCount ?? 0}
-            </Text>
-            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
-              Serving Now
-            </Text>
-          </View>
-
-          <View style={[styles.metricCard, getCardStyle()]}>
-            <Text style={[styles.metricNum, { color: colors.warning }]}>
-              {queueDetails?.waitingCount ?? 0}
-            </Text>
-            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
-              In Waiting Line
-            </Text>
-          </View>
-
-          <View style={[styles.metricCard, getCardStyle()]}>
-            <Text style={[styles.metricNum, { color: colors.textPrimary }]}>
-              {queueDetails?.completedTodayCount ?? 0}
-            </Text>
-            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
-              Finished Today
-            </Text>
-          </View>
-        </View>
-      </View>
+      
 
       {/* Currently Serving Section */}
       <View style={styles.section}>
@@ -377,6 +449,150 @@ export const OwnerScreen: React.FC = () => {
           </View>
         )}
       </View>
+
+ {/* Salon Open/Closed Status Card */}
+      {activeSalon && (
+        <View style={[styles.statusCard, getCardStyle()]}>
+          <View style={styles.statusRow}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.statusLabelRow}>
+                <View
+                  style={[
+                    styles.statusIndicator,
+                    { backgroundColor: isOpen ? colors.success : colors.danger },
+                  ]}
+                />
+                <Text style={[styles.statusTitle, { color: colors.textPrimary }]}>
+                  {isOpen ? 'Shop is Open' : 'Shop is Closed'}
+                </Text>
+              </View>
+              <Text style={[styles.statusSub, { color: colors.textSecondary }]}>
+                {isOpen
+                  ? 'Open for walk-ins & appointments today. Tap switch to close this evening.'
+                  : 'Closed for the night. Tap switch every morning to open your shop.'}
+              </Text>
+            </View>
+
+            <Switch
+              value={isOpen}
+              onValueChange={handleToggleOpen}
+              trackColor={{ false: '#D1D5DB', true: colors.success }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
+      )}
+
+
+      {/* Salon Showcase Photo Section (Optional Capture / Brand Image Fallback) */}
+      {activeSalon && (
+        <View style={[styles.photoCard, getCardStyle()]}>
+          <View style={styles.photoHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <AppIcon name="camera-outline" size={17} color={colors.accent} style={{ marginRight: 6 }} />
+                <Text style={[styles.photoCardTitle, { color: colors.textPrimary }]}>
+                  Showcase Photo
+                </Text>
+              </View>
+              {/* <Text style={[styles.photoCardSubtitle, { color: colors.textSecondary }]}>
+                Optional: Capture or upload photos of your shop. Customers will see this on their cards. Until uploaded, our default brand image is shown.
+              </Text> */}
+            </View>
+          </View>
+
+          {/* Photo Preview Container */}
+          <View style={styles.photoPreviewWrapper}>
+            <Image
+              source={{ uri: currentPhotoUrl }}
+              style={styles.photoPreviewImage}
+              resizeMode="cover"
+            />
+            {/* Badge: Custom or Default Brand */}
+            <View
+              style={[
+                styles.photoBadge,
+                {
+                  backgroundColor: hasCustomPhoto
+                    ? 'rgba(16, 185, 129, 0.92)'
+                    : 'rgba(59, 130, 246, 0.92)',
+                },
+              ]}
+            >
+              <AppIcon
+                name={hasCustomPhoto ? 'checkmark-circle-outline' : 'sparkles-outline'}
+                size={12}
+                color="#FFFFFF"
+                style={{ marginRight: 4 }}
+              />
+              <Text style={styles.photoBadgeText}>
+                {hasCustomPhoto ? 'Custom Salon Photo' : 'Official Brand Image (Default)'}
+              </Text>
+            </View>
+            {photoLoading && (
+              <View style={styles.photoLoadingOverlay}>
+                <ActivityIndicator size="large" color="#FFFFFF" />
+              </View>
+            )}
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.photoBtnRow}>
+            <TouchableOpacity
+              style={[styles.photoBtn, { backgroundColor: colors.accent }]}
+              activeOpacity={0.8}
+              onPress={handleTakePhoto}
+              disabled={photoLoading}
+            >
+              <AppIcon name="camera" size={15} color={colors.accentText} style={{ marginRight: 6 }} />
+              <Text style={[styles.photoBtnText, { color: colors.accentText }]}>Take Photo</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.photoBtn,
+                {
+                  backgroundColor: colors.surfaceMuted,
+                  borderColor: colors.cardBorder,
+                  borderWidth: 1,
+                },
+              ]}
+              activeOpacity={0.8}
+              onPress={handlePickFromGallery}
+              disabled={photoLoading}
+            >
+              <AppIcon name="images-outline" size={15} color={colors.textPrimary} style={{ marginRight: 6 }} />
+              <Text style={[styles.photoBtnText, { color: colors.textPrimary }]}>Choose Photo</Text>
+            </TouchableOpacity>
+          </View>
+
+          {hasCustomPhoto && (
+            <TouchableOpacity
+              style={styles.resetBtn}
+              activeOpacity={0.7}
+              onPress={handleResetPhoto}
+              disabled={photoLoading}
+            >
+              <AppIcon name="refresh-outline" size={13} color={colors.textTertiary} style={{ marginRight: 4 }} />
+              <Text style={[styles.resetBtnText, { color: colors.textTertiary }]}>
+                Reset to Default Brand Image
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+     
+
+
+     
+
+      {/* Edit Salon Details Modal */}
+      <EditSalonModal
+        visible={editModalVisible}
+        salon={activeSalon}
+        onClose={() => setEditModalVisible(false)}
+      />
     </ScrollView>
   );
 };
@@ -417,6 +633,17 @@ const styles = StyleSheet.create({
   ownerIdText: {
     fontSize: 10,
     fontWeight: '600',
+  },
+  editDetailsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+  },
+  editDetailsBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   salonTitle: {
     fontSize: 18,
@@ -470,11 +697,11 @@ const styles = StyleSheet.create({
   verifyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
   },
   verifyTitle: {
     fontSize: 15,
     fontWeight: '700',
+    marginBottom: 12,
   },
   verifySub: {
     fontSize: 11,
@@ -525,10 +752,10 @@ const styles = StyleSheet.create({
   metricsTitle: {
     fontSize: 14,
     fontWeight: '700',
+    marginBottom: 10,
   },
   metricsSubtitle: {
     fontSize: 11,
-    marginBottom: 10,
   },
   metricsGrid: {
     flexDirection: 'row',
@@ -640,5 +867,88 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 12,
     textAlign: 'center',
+  },
+  photoCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 18,
+  },
+  photoHeaderRow: {
+    marginBottom: 10,
+  },
+  photoCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  photoCardSubtitle: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 3,
+  },
+  photoPreviewWrapper: {
+    position: 'relative',
+    height: 180,
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 12,
+    backgroundColor: '#000000',
+  },
+  photoPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  photoBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  photoBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  photoLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  photoBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  photoBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  resetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    paddingVertical: 4,
+  },
+  resetBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });

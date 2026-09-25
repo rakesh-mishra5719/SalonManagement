@@ -18,7 +18,7 @@ interface BottomTabBarProps {
 }
 
 export const BottomTabBar: React.FC<BottomTabBarProps> = ({ role, activeTab, onSelectTab }) => {
-  const { colors, getCardStyle, designPattern } = useTheme();
+  const { colors, getCardStyle } = useTheme();
 
   const clientTabs: TabItem[] = [
     { id: 'explore', label: 'Explore', icon: 'search', activeIcon: 'search' },

@@ -55,6 +55,11 @@ export interface QueueEntry {
   createdAt: string;
   verifiedAt?: string;
   completedAt?: string;
+  salonName?: string;
+  salonAddress?: string;
+  latitude?: number;
+  longitude?: number;
+  salon?: Salon;
 }
 
 export interface SalonQueueDetails {

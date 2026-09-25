@@ -2,15 +2,17 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User, UserRole } from '../types';
 import { api } from '../services/api';
 import { Platform } from 'react-native';
+import { storage } from '../services/storage';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (identifier: string, pass: string) => Promise<User>;
   sendOtp: (phone: string) => Promise<{ success: boolean; message: string; demoOtp?: string }>;
-  registerClient: (data: { name: string; phone: string; password: string; otpCode: string }) => Promise<User>;
+  registerClient: (data: { name: string; email?: string; phone: string; password: string; otpCode?: string }) => Promise<User>;
   registerOwner: (data: any) => Promise<User>;
   logout: () => void;
+  updateUserSalon: (updatedSalon: any) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,32 +20,56 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_STORAGE_KEY = 'salon_auth_session';
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  // Synchronous web hydration: loads user on first render without screen flicker
+  const [user, setUser] = useState<User | null>(() => {
+    const sync = storage.getSync(AUTH_STORAGE_KEY);
+    if (sync) {
+      try {
+        return JSON.parse(sync);
+      } catch (_) {}
+    }
+    return null;
+  });
 
-  // Restore saved session if available
+  // On Web, state is already known synchronously; on Native, wait for async restore
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (Platform.OS === 'web') {
+      return false;
+    }
+    return true;
+  });
+
+  // Universal session restoration (Native iOS/Android/Expo Go + Web verification)
   useEffect(() => {
-    try {
-      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-        const stored = window.localStorage.getItem(AUTH_STORAGE_KEY);
-        if (stored) {
-          setUser(JSON.parse(stored));
+    let isMounted = true;
+
+    const restoreSession = async () => {
+      try {
+        const stored = await storage.getItem(AUTH_STORAGE_KEY);
+        if (stored && isMounted) {
+          const parsed = JSON.parse(stored);
+          setUser(parsed);
+        }
+      } catch (err) {
+        console.warn('Could not restore auth session:', err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
         }
       }
-    } catch (err) {
-      console.warn('Could not restore auth session:', err);
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    restoreSession();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const saveUserSession = (userData: User) => {
     setUser(userData);
-    try {
-      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData));
-      }
-    } catch (_) {}
+    storage.setItem(AUTH_STORAGE_KEY, JSON.stringify(userData)).catch((err) => {
+      console.warn('Failed to persist session:', err);
+    });
   };
 
   const login = async (identifier: string, pass: string): Promise<User> => {
@@ -66,7 +92,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return await api.sendOtp(phone);
   };
 
-  const registerClient = async (data: { name: string; phone: string; password: string; otpCode: string }): Promise<User> => {
+  const registerClient = async (data: { name: string; email?: string; phone: string; password: string; otpCode?: string }): Promise<User> => {
     const res = await api.registerClient(data);
     const clientUser: User = {
       id: res.id,
@@ -98,11 +124,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     setUser(null);
-    try {
-      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.removeItem(AUTH_STORAGE_KEY);
-      }
-    } catch (_) {}
+    storage.removeItem(AUTH_STORAGE_KEY).catch((err) => {
+      console.warn('Failed to remove auth session:', err);
+    });
+  };
+
+  const updateUserSalon = (updatedSalon: any) => {
+    if (!user) return;
+    const existingSalon = user.salon || {};
+    const newSalon = { ...existingSalon, ...updatedSalon };
+    const updatedUser: User = { ...user, salon: newSalon };
+    saveUserSession(updatedUser);
   };
 
   return (
@@ -115,6 +147,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         registerClient,
         registerOwner,
         logout,
+        updateUserSalon,
       }}
     >
       {children}

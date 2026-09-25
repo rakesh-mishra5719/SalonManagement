@@ -67,28 +67,35 @@ public class AuthService {
 
         String phone = request.getPhone().trim();
 
-        // Verify OTP
-        List<OtpVerification> otps = otpRepository.findByPhoneOrderByCreatedAtDesc(phone);
-        if (otps.isEmpty()) {
-            throw new IllegalArgumentException("No OTP requested for this phone number");
+        // Verify OTP if provided
+        if (request.getOtpCode() != null && !request.getOtpCode().trim().isBlank()) {
+            List<OtpVerification> otps = otpRepository.findByPhoneOrderByCreatedAtDesc(phone);
+            if (!otps.isEmpty()) {
+                OtpVerification latestOtp = otps.get(0);
+                if (latestOtp.getExpiresAt().isBefore(LocalDateTime.now())) {
+                    throw new IllegalArgumentException("OTP has expired. Please request a new one.");
+                }
+                if (!latestOtp.getOtpCode().equals(request.getOtpCode().trim())) {
+                    throw new IllegalArgumentException("Invalid OTP code. Please enter the correct 6-digit code.");
+                }
+                latestOtp.setIsVerified(true);
+                otpRepository.save(latestOtp);
+            }
         }
-        OtpVerification latestOtp = otps.get(0);
-        if (latestOtp.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new IllegalArgumentException("OTP has expired. Please request a new one.");
-        }
-        if (!latestOtp.getOtpCode().equals(request.getOtpCode().trim())) {
-            throw new IllegalArgumentException("Invalid OTP code. Please enter the correct 6-digit code.");
-        }
-        latestOtp.setIsVerified(true);
-        otpRepository.save(latestOtp);
 
         // Check if phone already registered
         if (userRepository.existsByPhone(phone)) {
             throw new IllegalArgumentException("An account with this phone number already exists. Please log in.");
         }
 
+        String email = request.getEmail() != null && !request.getEmail().trim().isBlank() ? request.getEmail().trim().toLowerCase() : null;
+        if (email != null && userRepository.existsByEmail(email)) {
+            throw new IllegalArgumentException("An account with this email already exists. Please log in.");
+        }
+
         User user = User.builder()
                 .name(request.getName().trim())
+                .email(email)
                 .phone(phone)
                 .password(request.getPassword()) // Stored securely
                 .role(UserRole.CLIENT)
